@@ -3,12 +3,16 @@ from main.arffJson.ArffJsonCorpus import ArffJsonCorpus, ArffJsonDocument
 import joblib
 import numpy as np
 from sklearn.cluster import AffinityPropagation
+import random
 
-corpusFilepath = "/home/simon/Projekte/MIRS/testing_java_ml_libraries/raw_vector.json"
+random.seed(0)
+
+corpusFilepath = "/raid0/barthel/projects/zb_math_cluster_experiments/raw_data/raw_vector.json"
 corpus = ArffJsonCorpus(corpusFilepath)
-TDM = corpus.toCsrMatrix(shapeCols = 54334)
+TDM = corpus.toCsrMatrix(shapeCols = 54334, selection = lambda doc: True if random.random() < 0.333 else False)
+print "TDM shape: " + str(TDM.shape)
 
-svd2 = joblib.load("lsi250-model")
+svd2 = joblib.load("models/lsi250-model")
 LSI_TDM = svd2.transform(TDM)
 
 ap = AffinityPropagation(
@@ -22,4 +26,4 @@ ap = AffinityPropagation(
 )
 
 ap.fit(LSI_TDM)
-joblib.dump(ap, "ap-sklean_lsi250")
+joblib.dump(ap, "models/ap-sklean_lsi250")

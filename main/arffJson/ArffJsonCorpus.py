@@ -21,7 +21,7 @@ class ArffJsonCorpus:
     def toNumpyArray(self):
         return np.array(list(self))
 
-    def toCsrMatrix(self, projection = None, shapeRows = None, shapeCols = None):
+    def toCsrMatrix(self, projection = None, shapeCols = None, selection = None):
         row = []
         col = []
         data = []
@@ -29,15 +29,14 @@ class ArffJsonCorpus:
         if projection is None:
             numDocs = 0
             for doc in iter(self):
-                numDocs += 1
+                if selection is None or selection(doc):
+		    numDocs += 1
+                    for key, val in doc.data:
+                        row.append(numDocs-1)
+                        col.append(key)
+                        data.append(val)
 
-                for key, val in doc.data:
-                    row.append(numDocs-1)
-                    col.append(key)
-                    data.append(val)
-
-            if shapeRows is None:
-                shapeRows = numDocs
+            shapeRows = numDocs
 
             if shapeCols is None:
                 shapeCols = max(col)+1
@@ -48,16 +47,16 @@ class ArffJsonCorpus:
 
             numDocs = 0
             for doc in iter(self):
-                numDocs += 1
+                if selection is None or selection(doc):
+                    numDocs += 1
 
-                for key, val in doc.data:
-                    if key in index2ProjectIndex:
-                        row.append(numDocs-1)
-                        col.append(index2ProjectIndex[key])
-                        data.append(val)
-
-            if shapeRows is None:
-                shapeRows = numDocs
+                    for key, val in doc.data:
+                        if key in index2ProjectIndex:
+                            row.append(numDocs-1)
+                            col.append(index2ProjectIndex[key])
+                            data.append(val)
+            
+            shapeRows = numDocs
 
             if shapeCols is None:
                 shapeCols = max(col)+1
