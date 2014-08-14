@@ -27,7 +27,6 @@ gmm = VBGMM(n_components=63)
 gmm.fit(TDM)
 joblib.dump(gmm, "gmm63-allchi2geq2000")
 
-#index2chiIndex = dict(map(lambda x: (int(x[0]), x[1]), json.load(open("index2chiIndexForGmm.json")).items()))
 
 """
 print "00 - History: " + repr(readChiFile("chi-00", index2Word)[:10])
