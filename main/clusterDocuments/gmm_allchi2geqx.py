@@ -11,6 +11,7 @@ import json
 corpusFilepath = "/home/simon/Projekte/zbMathClustering/raw_vector-small.json"
 corpus = ArffJsonCorpus(corpusFilepath)
 
+
 """TDM = corpus.toCsrMatrix()
 labelMatrix, classLabel2Number, classNumber2Label = initializeLabelMatrix(corpus)
 
