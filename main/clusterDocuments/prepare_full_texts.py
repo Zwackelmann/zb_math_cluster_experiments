@@ -7,7 +7,7 @@ from scipy.sparse import csr_matrix
 from util import save_csr_matrix, load_csr_matrix
 
 dirpath = "/home/simon/samba/ifis/ifis/Datasets/math_challange/NTCIR_2014_enriched/"
-filenamesFile = "ntcir_filenames"
+filenamesFile = "raw_data/ntcir_filenames"
 
 tmp = [ (line.strip(), dirpath + line.strip()) for line in open(filenamesFile) ]
 filenames = map(lambda x: x[0], tmp)
@@ -95,14 +95,11 @@ tokens2IndexMap = json.load(open("zb_math_full_texts_tokens2IndexMap"))
 dumpDocumentDataMaps(tokens2IndexMap, zip(filenames, filepaths), "full_text_term_value_maps")
 """
 
-"""
 # transform intermediate full text data maps into a csr_matrix
-tokens2IndexMap = json.load(open("zb_math_full_texts_tokens2IndexMap"))
-filepaths = [ path.join("full_text_term_value_maps", f) for f in listdir("full_text_term_value_maps") if path.isfile(path.join("full_text_term_value_maps", f)) ]
+tokens2IndexMap = json.load(open("derived_data/zb_math_full_texts_tokens2IndexMap"))
+filepaths = [ path.join("derived_data/full_text_term_value_maps", f) for f in listdir("derived_data/full_text_term_value_maps") if path.isfile(path.join("derived_data/full_text_term_value_maps", f)) ]
 matrix = documentDataMaps2CsrMatrix(filepaths, len(tokens2IndexMap))
-print matrix
-save_csr_matrix(matrix, "zb_math_full_text_tdm")
-"""
+save_csr_matrix(matrix, "derived_data/zb_math_full_text_tdm")
 
 """
 # load term-document-matrix
