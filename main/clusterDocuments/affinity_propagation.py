@@ -9,7 +9,7 @@ random.seed(0)
 
 corpusFilepath = "/raid0/barthel/projects/zb_math_cluster_experiments/raw_data/raw_vector.json"
 corpus = ArffJsonCorpus(corpusFilepath)
-TDM = corpus.toCsrMatrix(shapeCols = 54334, selection = lambda doc: True if random.random() < 0.333 else False)
+TDM = corpus.toCsrMatrix(shapeCols = 54334, selection = lambda doc: True if random.random() < 0.125 else False)
 print "TDM shape: " + str(TDM.shape)
 
 svd2 = joblib.load("models/lsi250-model")
