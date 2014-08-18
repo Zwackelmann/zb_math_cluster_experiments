@@ -5,6 +5,7 @@ import json
 from full_text_util import Document, DocumentParser
 from scipy.sparse import csr_matrix
 from util import save_csr_matrix, load_csr_matrix
+import time
 
 dirpath = "/home/simon/samba/ifis/ifis/Datasets/math_challange/NTCIR_2014_enriched/"
 filenamesFile = "raw_data/ntcir_filenames"
@@ -72,6 +73,20 @@ def documentDataMaps2CsrMatrix(filepaths, numAttributes):
 
 	return csr_matrix( (data,(row,col)), shape=(numDocs, numAttributes) )
 
+def documents2ArffJsonInstancesCorpus(filepaths, tokens2IndexMap):
+	p = DocumentParser()
+
+	f = open("raw_data/fulltext-corpus.json", "w")
+	f.write("{\"relation-name\":\"full-text-corpus\",\"num-attributes\":" + str(len(tokens2IndexMap)) + "}\n")
+
+	for filepath in filepaths:
+		doc = p.parse(filepath)
+		if "zbmath metadata" in doc.includedSources:
+			f.write(doc.toArffJsonDocument(tokens2IndexMap) + "\n")
+			f.flush()
+
+	f.close()
+
 """
 # save word count dict
 wordCounts = buildWordCountDict(filepaths)
@@ -91,15 +106,18 @@ f.close()
 
 """
 # dump intermediate full text data maps
-tokens2IndexMap = json.load(open("zb_math_full_texts_tokens2IndexMap"))
+tokens2IndexMap = json.load(open("derived_data/zb_math_full_texts_tokens2IndexMap"))
 dumpDocumentDataMaps(tokens2IndexMap, zip(filenames, filepaths), "full_text_term_value_maps")
 """
 
-# transform intermediate full text data maps into a csr_matrix
 tokens2IndexMap = json.load(open("derived_data/zb_math_full_texts_tokens2IndexMap"))
+documents2ArffJsonInstancesCorpus(filepaths, tokens2IndexMap)
+
+# transform intermediate full text data maps into a csr_matrix
+"""tokens2IndexMap = json.load(open("derived_data/zb_math_full_texts_tokens2IndexMap"))
 filepaths = [ path.join("derived_data/full_text_term_value_maps", f) for f in listdir("derived_data/full_text_term_value_maps") if path.isfile(path.join("derived_data/full_text_term_value_maps", f)) ]
 matrix = documentDataMaps2CsrMatrix(filepaths, len(tokens2IndexMap))
-save_csr_matrix(matrix, "derived_data/zb_math_full_text_tdm")
+save_csr_matrix(matrix, "derived_data/zb_math_full_text_tdm")"""
 
 """
 # load term-document-matrix
