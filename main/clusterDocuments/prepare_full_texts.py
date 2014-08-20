@@ -87,6 +87,7 @@ def documents2ArffJsonInstancesCorpus(filepaths, tokens2IndexMap):
 	f.write("{\"relation-name\":\"full-text-corpus\",\"num-attributes\":" + str(len(tokens2IndexMap)) + "}\n")
 
 	for filepath in filepaths:
+		print filepath
 		doc = p.parse(filepath)
 		if "zbmath metadata" in doc.includedSources:
 			f.write(doc.toArffJsonDocument(tokens2IndexMap) + "\n")

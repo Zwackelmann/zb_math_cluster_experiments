@@ -9,14 +9,14 @@ random.seed(0)
 
 corpusFilepath = "/raid0/barthel/projects/zb_math_cluster_experiments/raw_data/raw_vector.json"
 corpus = ArffJsonCorpus(corpusFilepath)
-TDM = corpus.toCsrMatrix(shapeCols = 54334, selection = lambda doc: True if random.random() < 0.125 else False)
+TDM = corpus.toCsrMatrix(shapeCols = 54334, selection = lambda doc: True if random.random() < 0.1 else False)
 print "TDM shape: " + str(TDM.shape)
 
 svd2 = joblib.load("models/lsi250-model")
 LSI_TDM = svd2.transform(TDM)
 
 ap = AffinityPropagation(
-	damping=0.5, 
+	damping=0.85, 
 	max_iter=200, 
 	convergence_iter=15, 
 	copy=True, 
@@ -26,4 +26,4 @@ ap = AffinityPropagation(
 )
 
 ap.fit(LSI_TDM)
-joblib.dump(ap, "models/ap-sklean_lsi250")
+joblib.dump(ap, "models/ap-damp085-sklean_lsi250")
