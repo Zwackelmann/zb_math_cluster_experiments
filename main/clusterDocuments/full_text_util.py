@@ -4,6 +4,8 @@ from string import digits
 from nltk.stem import WordNetLemmatizer
 from sklearn.feature_extraction.text import CountVectorizer
 import time
+import nltk
+import re
 
 class Document:
 	def __init__(self, identifiers = [], title = None, 
@@ -87,7 +89,8 @@ class Document:
 class DocumentParser:
 	def __init__(self):
 		self.textTokenizer = DocumentParser.TextTokenizer()
-		self.formulaTokenizer = DocumentParser.FormulaTokenizer()
+		self.formulaTokenizer = DocumentParser.FormulaTokenizer()#
+		self.sentenceDetector = nltk.data.load('tokenizers/punkt/english.pickle')
 
 	def parse(self, filepath):
 		source = open(filepath)
@@ -101,11 +104,56 @@ class DocumentParser:
 				tokens.extend(self.textTokenizer.tokenize(content.content))
 			elif type(content) is DocumentParser.RawDocument.FormulaContent:
 				tokens.extend(self.formulaTokenizer.tokenize(content.content))
+			elif type(content) is DocumentParser.RawDocument.Paragraph:
+				pass
 			else:
 				raise ValueError(str(type(content)) + " is not supported")
 
 		rawDocument.rawContent = tokens
 		return rawDocument.toDocument()
+
+	def parseWithParagraphStructure(self, filepath):
+		source = open(filepath)
+		rawDocument = DocumentParser.RawDocument()
+
+		ch = DocumentParser.ZbMathContentHandler(rawDocument)
+		xml.sax.parse(source, ch)
+
+		paragraphs = []
+		paragraphBuffer = []
+		formulaCount = 0
+		formulaDict = { }
+		for content in rawDocument.rawContent:
+			if type(content) is DocumentParser.RawDocument.TextContent:
+				paragraphBuffer.append(content.content)
+			elif type(content) is DocumentParser.RawDocument.FormulaContent:
+				paragraphBuffer.append("$" + str(formulaCount) + "$")
+				formulaDict[formulaCount] = content.content
+				formulaCount += 1
+			elif type(content) is DocumentParser.RawDocument.Paragraph:
+				paragraphString = " ".join(paragraphBuffer)
+				paragraphBuffer = []
+				sentences = self.sentenceDetector.tokenize(paragraphString)
+
+				paragraphs.append(map(lambda s : self.tokenizeSentence(s, formulaDict), sentences))
+			else:
+				raise ValueError(str(type(content)) + " is not supported")
+
+		return paragraphs
+
+	def tokenizeSentence(self, sentence, formulaDict):
+		tokens = []
+
+		while len(sentence) != 0:
+			res = re.search(r"\$\d+\$", sentence)
+			if res is None:
+				tokens.extend(self.textTokenizer.tokenize(sentence))
+				break
+			else:
+				tokens.extend(self.textTokenizer.tokenize(sentence[:res.start()]))
+				tokens.append("$" + formulaDict[int(sentence[res.start()+1:res.end()-1])] + "$")
+				sentence = sentence[res.end():]
+		return tokens
 
 	class RawDocument:
 		def __init__(self):
@@ -128,6 +176,10 @@ class DocumentParser:
 		class TextContent(object):
 			def __init__(self, content):
 				self.content = content
+
+		class Paragraph(object):
+			def __init__(self, ident):
+				self.ident = ident
 
 		def toDocument(self):
 			authors = []
@@ -170,20 +222,20 @@ class DocumentParser:
 		def startElement(self, name, attrs):
 			self.path.append(name)
 			
-			# extract metadata
-			if len(self.path) >= 2 and self.path[-2] == "identifiers" and self.path[-1] == "id":
-				self.document.identifiers.append({ 'type' : attrs['type'] })
+			if len(self.path) <= 1:
+				return
 
-			if name=="math":
-				self.document.rawContent.append(DocumentParser.RawDocument.FormulaContent(attrs.get('alttext')))
-
-			# if 'content' in self.path and not 'math' in self.path and not 'table' in self.path:
-			# 	"ignore"
+			if self.path[1] == "metadata":
+				if len(self.path) >= 2 and self.path[-2] == "identifiers" and self.path[-1] == "id":
+					self.document.identifiers.append({ 'type' : attrs['type'] })
+			elif self.path[1] == "content":
+				if name == "math":
+					self.document.rawContent.append(DocumentParser.RawDocument.FormulaContent(attrs.get('alttext')))
+				elif len(self.path) == 3 and name == "div":
+					self.document.rawContent.append(DocumentParser.RawDocument.Paragraph(attrs['id']))
 
 		def endElement(self, name):
 			del self.path[-1] 
-			# if 'content' in self.path and not 'math' in self.path and not name == 'math' and not 'table' in self.path and not name == 'table':
-			# 	"ignore"
 
 		def characters(self, content):
 			if len(self.path) <= 1:

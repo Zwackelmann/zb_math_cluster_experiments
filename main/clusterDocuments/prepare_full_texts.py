@@ -7,19 +7,10 @@ from scipy.sparse import csr_matrix
 from util import save_csr_matrix, load_csr_matrix
 import time
 import uuid
+import numpy as np
 
-if uuid.getnode() == 161338626918L: # is69
-	dirpath = "/raid0/barthel/data/NTCIR_2014_enriched/"
-elif uuid.getnode() == 622600420609L: # xmg-laptop
-	dirpath = "/home/simon/samba/ifis/ifis/Datasets/math_challange/NTCIR_2014_enriched/"
-else:
-	raise ValueError("unknown node id " + str(uuid.getnode()))
-
-filenamesFile = "raw_data/ntcir_filenames"
-
-tmp = [ (line.strip(), dirpath + line.strip()) for line in open(filenamesFile) ]
-filenames = map(lambda x: x[0], tmp)
-filepaths = map(lambda x: x[1], tmp)
+dirpath = get_dirpath()
+filenames, filepaths = get_filenames_and_filepaths("raw_data/ntcir_filenames")
 
 def buildWordCountDict(filepaths):
 	p = DocumentParser()
@@ -94,6 +85,12 @@ def documents2ArffJsonInstancesCorpus(filepaths, tokens2IndexMap):
 
 	f.close()
 
+"""p = DocumentParser()
+doc = p.parseWithParagraphStructure(filepaths[0])
+np.save(filenames[0], doc)"""
+
+# print "\n\n\n".join(map(lambda par: ">>>\n".join(map(lambda s: ",".join(s), par)), p.parseWithParagraphStructure(filepaths[0])))
+
 """
 # save word count dict
 wordCounts = buildWordCountDict(filepaths)
@@ -117,8 +114,11 @@ tokens2IndexMap = json.load(open("derived_data/zb_math_full_texts_tokens2IndexMa
 dumpDocumentDataMaps(tokens2IndexMap, zip(filenames, filepaths), "full_text_term_value_maps")
 """
 
+"""
+# dump arff json corpus
 tokens2IndexMap = json.load(open("derived_data/zb_math_full_texts_tokens2IndexMap"))
 documents2ArffJsonInstancesCorpus(filepaths, tokens2IndexMap)
+"""
 
 # transform intermediate full text data maps into a csr_matrix
 """tokens2IndexMap = json.load(open("derived_data/zb_math_full_texts_tokens2IndexMap"))

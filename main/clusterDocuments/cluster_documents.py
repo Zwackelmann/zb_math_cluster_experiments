@@ -53,14 +53,15 @@ joblib.dump(km, "models/km63-full_text_tfidf")"""
 # joblib.dump(g, gmmModelFile)
 
 clModel = joblib.load("models/km63-full_text_tfidf")
-TDM_full_text = load_csr_matrix("derived_data/zb_math_full_text_tdm.npz")
+corpus = ArffJsonCorpus("raw_data/fulltext-corpus.json")
 tfidf_trans = joblib.load("models/tfidf_full_text_model")
-TDM_full_text_reweighted = tfidf_trans.transform(TDM_full_text)
 
-log = open("results/clusters-ac-full_text_tfidf", "w")
-for doc in TDM_full_text_reweighted:
-	# sparseVector = sparseData2Matrix(doc.data, numAttributes)
-	# lsiVector = lsiModel.transform(sparseVector)
-	log.write("0;" + str(clModel.predict(doc)[0]) + "\n")
+log = open("results/clusters-km63-full_text_tfidf", "w")
+for doc in corpus:
+	sparseVector = sparseData2Matrix(doc.data, 78623)
+	reweighted = tfidf_trans.transform(sparseVector)
+
+	log.write(doc.id + ";" + str(clModel.predict(reweighted)[0]) + "\n")
+	log.flush()
 
 log.close()
