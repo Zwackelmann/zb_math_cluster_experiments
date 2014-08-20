@@ -89,7 +89,9 @@ def documents2ArffJsonInstancesCorpus(filepaths, tokens2IndexMap):
 doc = p.parseWithParagraphStructure(filepaths[0])
 np.save(filenames[0], doc)"""
 
-# print "\n\n\n".join(map(lambda par: ">>>\n".join(map(lambda s: ",".join(s), par)), p.parseWithParagraphStructure(filepaths[0])))
+for filename, filepath in zip(filenames, filepaths):
+	doc = p.parseWithParagraphStructure(filepath)
+	np.save("derived_data/full_text_arrays/" + filename, doc)
 
 """
 # save word count dict
