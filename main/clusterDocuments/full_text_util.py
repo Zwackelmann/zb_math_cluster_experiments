@@ -151,7 +151,9 @@ class DocumentParser:
 				break
 			else:
 				tokens.extend(self.textTokenizer.tokenize(sentence[:res.start()]))
-				tokens.append("$" + formulaDict[int(sentence[res.start()+1:res.end()-1])] + "$")
+                                formula = formulaDict.get(int(sentence[res.start()+1:res.end()-1]))
+                                if not formula is None:
+				    tokens.append("$" + formula  + "$")
 				sentence = sentence[res.end():]
 		return tokens
 

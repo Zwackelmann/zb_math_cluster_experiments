@@ -4,7 +4,7 @@ from os import listdir
 import json
 from full_text_util import Document, DocumentParser
 from scipy.sparse import csr_matrix
-from util import save_csr_matrix, load_csr_matrix
+from util import save_csr_matrix, load_csr_matrix, get_dirpath, get_filenames_and_filepaths
 import time
 import uuid
 import numpy as np
@@ -85,13 +85,12 @@ def documents2ArffJsonInstancesCorpus(filepaths, tokens2IndexMap):
 
 	f.close()
 
-"""p = DocumentParser()
-doc = p.parseWithParagraphStructure(filepaths[0])
-np.save(filenames[0], doc)"""
-
-for filename, filepath in zip(filenames, filepaths):
+p = DocumentParser()
+for filename, filepath in zip(filenames, filepaths)[6200:]:
+	print filename
 	doc = p.parseWithParagraphStructure(filepath)
 	np.save("derived_data/full_text_arrays/" + filename, doc)
+
 
 """
 # save word count dict

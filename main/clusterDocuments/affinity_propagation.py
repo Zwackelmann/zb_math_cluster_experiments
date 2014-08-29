@@ -2,7 +2,7 @@ from sklearn.decomposition import TruncatedSVD
 from main.arffJson.ArffJsonCorpus import ArffJsonCorpus, ArffJsonDocument
 import joblib
 import numpy as np
-from sklearn.cluster import AffinityPropagation
+from sklearn.cluster import AffinityPropagation, MeanShift
 import random
 
 random.seed(0)
@@ -15,15 +15,26 @@ print "TDM shape: " + str(TDM.shape)
 svd2 = joblib.load("models/lsi250-model")
 LSI_TDM = svd2.transform(TDM)
 
-ap = AffinityPropagation(
-	damping=0.85, 
-	max_iter=200, 
-	convergence_iter=15, 
-	copy=True, 
-	preference=None, 
-	affinity='euclidean', 
-	verbose=False
+#ap = AffinityPropagation(
+#	damping=0.95, 
+#	max_iter=200, 
+#	convergence_iter=15, 
+#	copy=True, 
+#	preference=None, 
+#	affinity='euclidean', 
+#	verbose=False
+#)
+
+# ap.fit(LSI_TDM)
+
+ms = MeanShift(
+    bandwidth = None,
+    seeds = None,
+    bin_seeding = False,
+    min_bin_freq = 1,
+    cluster_all = True
 )
 
-ap.fit(LSI_TDM)
-joblib.dump(ap, "models/ap-damp085-sklean_lsi250")
+ms.fit(LSI_TDM)
+
+joblib.dump(ms, "models/ms-sklean_lsi250")
