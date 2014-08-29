@@ -2,12 +2,8 @@ from sklearn.decomposition import TruncatedSVD
 from main.arffJson.ArffJsonCorpus import ArffJsonCorpus, ArffJsonDocument
 import joblib
 import numpy as np
-<<<<<<< HEAD
 from sklearn.cluster import AffinityPropagation, MeanShift
-=======
-from sklearn.cluster import AffinityPropagation
 from sklearn.mixture import GMM
->>>>>>> e2a51c5144409b3c12e0c91f770319673b7f5a47
 import random
 
 random.seed(0)
@@ -20,7 +16,6 @@ print "TDM shape: " + str(TDM.shape)
 svd2 = joblib.load("models/lsi250-model")
 LSI_TDM = svd2.transform(TDM)
 
-<<<<<<< HEAD
 #ap = AffinityPropagation(
 #	damping=0.95, 
 #	max_iter=200, 
@@ -33,7 +28,7 @@ LSI_TDM = svd2.transform(TDM)
 
 # ap.fit(LSI_TDM)
 
-ms = MeanShift(
+"""ms = MeanShift(
     bandwidth = None,
     seeds = None,
     bin_seeding = False,
@@ -43,8 +38,8 @@ ms = MeanShift(
 
 ms.fit(LSI_TDM)
 
-joblib.dump(ms, "models/ms-sklean_lsi250")
-=======
+joblib.dump(ms, "models/ms-sklean_lsi250")"""
+
 """ap = AffinityPropagation(
 	damping=0.85, 
 	max_iter=200, 
@@ -58,7 +53,7 @@ joblib.dump(ms, "models/ms-sklean_lsi250")
 ap.fit(LSI_TDM)
 joblib.dump(ap, "models/ap-damp085-sklean_lsi250")"""
 
-gmm = GMM(
+"""gmm = GMM(
 	n_components=63, 
 	covariance_type='diag', 
 	random_state=None, 
@@ -71,6 +66,4 @@ gmm = GMM(
 )
 
 gmm.fit(LSI_TDM)
-joblib.dump(gmm, "models/gmm-sklean_lsi250")
-
->>>>>>> e2a51c5144409b3c12e0c91f770319673b7f5a47
+joblib.dump(gmm, "models/gmm-sklean_lsi250")"""

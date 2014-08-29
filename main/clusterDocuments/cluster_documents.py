@@ -52,19 +52,13 @@ joblib.dump(km, "models/km63-full_text_tfidf")"""
 # g = fitGmmModel(getTDM())
 # joblib.dump(g, gmmModelFile)
 
-<<<<<<< HEAD
-clModel = joblib.load("models/ms-sklean_lsi250")
-corpus = ArffJsonCorpus("raw_data/raw_vector.json")
-lsi_model = joblib.load("models/lsi250-model")
 
-log = open("results/clusters-ms-sklean_lsi250", "w")
-=======
 clModel = joblib.load("models/gmm-sklean_lsi250")
 corpus = ArffJsonCorpus("raw_data/raw_vector.json")
 lsi_model = joblib.load("models/lsi250-model")
 
 log = open("results/clusters-gmm-sklean_lsi250", "w")
->>>>>>> e2a51c5144409b3c12e0c91f770319673b7f5a47
+
 for doc in corpus:
 	sparseDoc = sparseData2Matrix(doc, 54334)
 	arr = lsi_model.transform(sparseDoc)
