@@ -8,7 +8,7 @@ def readDict(dictFilepath):
 		index += 1
 	return index2Word
 
-def initializeLabelMatrix(corpus):
+def initializeLabelMatrixFromCorpus(corpus):
 	classLabel2Number = { }
 	classNumber2Label = { }
 	currClassIndex = 0
@@ -30,3 +30,26 @@ def initializeLabelMatrix(corpus):
 		 	labelMatrix[classLabel2Number[cl[:2]]][docIndex] = 1
 
 	return labelMatrix, classLabel2Number, classNumber2Label
+
+def initializeLabelMatrixFromClusters(clusterFile):
+	numDocs = 0
+	clusters = set()
+
+	for line in open(clusterFile):
+		x = line.split(";")
+		docCluster = int(x[1].strip())
+		clusters.add(docCluster)
+		numDocs += 1
+
+	numClusters = len(clusters)
+	labelMatrix = map(lambda x : [0]*numDocs, range(0, numClusters)) 
+
+	docIndex = 0
+	for line in open(clusterFile):
+		x = line.split(";")
+		docCluster = int(x[1].strip())
+
+		labelMatrix[int(docCluster)][docIndex] = 1
+		docIndex += 1
+
+	return labelMatrix
