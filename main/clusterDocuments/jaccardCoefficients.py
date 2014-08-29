@@ -5,7 +5,7 @@ def takeN(iter, n):
 	for i in xrange(n):
 		yield iter.next()
 
-clusterFile = open("results/clusters-km63-full_text_tfidf", "r")
+clusterFile = open("results/clusters-gmm-sklean_lsi250", "r")
 cluster2Documents = { }
 
 for line in clusterFile:
@@ -18,12 +18,12 @@ for line in clusterFile:
 
 	cluster2Documents[docClass].add(docId)
 
-corpusFilepath = "/home/simon/Projekte/MIRS/zb_math_cluster_experiments/raw_data/fulltext-corpus.json"
+corpusFilepath = "/home/simon/Projekte/MIRS/zb_math_cluster_experiments/raw_data/raw_vector.json"
 # mode=1: only main classes
 # mode=2: also secondary classes
 mode = 1
 
-consideredDocs = list(takeN(iter(ArffJsonCorpus(corpusFilepath)), 38141))
+consideredDocs = list(takeN(iter(ArffJsonCorpus(corpusFilepath)), 556296))
 print len(consideredDocs)
 
 category2Documents = { }

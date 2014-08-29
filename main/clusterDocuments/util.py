@@ -29,3 +29,12 @@ def get_filenames_and_filepaths(file):
 	filepaths = map(lambda x: x[1], tmp)
 
 	return filenames, filepaths
+
+def get_index_to_word_map(file):
+	count = 0
+	d = { }
+	for line in open(file):
+		d[count] = line.strip()
+		count += 1
+
+	return d
