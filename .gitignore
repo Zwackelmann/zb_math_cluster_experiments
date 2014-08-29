@@ -2,3 +2,4 @@ derived_data/
 models/
 raw_data/
 results/
+*.pyc
