@@ -5,6 +5,7 @@ import numpy as np
 from time import time
 from main.arffJson.ArffJsonCorpus import ArffJsonCorpus, ArffJsonDocument
 from string import digits, ascii_letters
+from os.path import isfile, join
 
 dirpath = get_dirpath()
 filenames, filepaths = get_filenames_and_filepaths("raw_data/ntcir_filenames")
@@ -32,18 +33,9 @@ for i in range(len(m.indptr)-1):
 		candidateInd.append(currInd)
 	currInd += 1
 
-ids = map(lambda i : row_number2fulltext_id_map[str(i)], candidateInd)
-documentFilenames = map(lambda id : filter(lambda c : c in ascii_letters or c in digits, id) + ".xml.npy", ids) 
+candidateIds = map(lambda i : row_number2fulltext_id_map[str(i)], candidateInd)
+candidateDocumentFilenames = map(lambda id : filter(lambda c : c in ascii_letters or c in digits, id) + ".xml.npy", candidateIds) 
+candidateDocumentFilepaths = map(lambda filename : join("derived_data/full_text_arrays", filename), candidateDocumentFilenames)
 
-print documentFilenames
-
-"""corpus = ArffJsonCorpus("raw_data/fulltext-corpus.json")
-m = { }
-count = 0
-for doc in corpus:
-	m[count] = doc.id
-	count += 1
-
-f = open("derived_data/row_number2fulltext_id_map.json", "w")
-f.write(json.dumps(m))
-f.close()"""
+for filepath in candidateDocumentFilepaths:
+	print np.load(filepath)
