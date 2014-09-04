@@ -1,10 +1,10 @@
 import json
 from scipy.sparse import csr_matrix
-from util import save_csr_matrix, load_csr_matrix, get_dirpath, get_filenames_and_filepaths
+from util import save_csr_matrix, load_csr_matrix, get_dirpath, get_filenames_and_filepaths, DocumentParser
 import numpy as np
-from full_text_util import DocumentParser
 from time import time
 from main.arffJson.ArffJsonCorpus import ArffJsonCorpus, ArffJsonDocument
+from string import digits, ascii_letters
 
 dirpath = get_dirpath()
 filenames, filepaths = get_filenames_and_filepaths("raw_data/ntcir_filenames")
@@ -32,8 +32,10 @@ for i in range(len(m.indptr)-1):
 		candidateInd.append(currInd)
 	currInd += 1
 
-print map(lambda i : row_number2fulltext_id_map[str(i)], candidateInd)
+ids = map(lambda i : row_number2fulltext_id_map[str(i)], candidateInd)
+documentFilenames = map(lambda id : filter(lambda c : c in ascii_letters or c in digits, id) + ".xml.npy", ids) 
 
+print documentFilenames
 
 """corpus = ArffJsonCorpus("raw_data/fulltext-corpus.json")
 m = { }

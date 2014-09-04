@@ -5,7 +5,7 @@ from sklearn.mixture import VBGMM
 from chi2_util import dumpChiScores, chiSetGeq
 import numpy as np
 import joblib
-from cluster_documents import sparseData2Matrix
+from cluster_documents_util import sparseData2Matrix
 import json
 
 corpusFilepath = "/home/simon/Projekte/zbMathClustering/raw_vector-small.json"
@@ -17,7 +17,7 @@ labelMatrix, classLabel2Number, classNumber2Label = initializeLabelMatrix(corpus
 
 dumpChiScores(TDM, labelMatrix, classNumber2Label)"""
 
-chiSet = chiSetGeq(2000.0)
+"""chiSet = chiSetGeq(2000.0)
 TDM, index2chiIndex = ArffJsonCorpus(corpusFilepath).toCsrMatrix(chiSet)
 
 f = open("index2chiIndexForGmm.json", "w")
@@ -26,16 +26,14 @@ f.close()
 
 gmm = VBGMM(n_components=63)
 gmm.fit(TDM)
-joblib.dump(gmm, "gmm63-allchi2geq2000")
+joblib.dump(gmm, "gmm63-allchi2geq2000")"""
 
-
-"""
 print "00 - History: " + repr(readChiFile("chi-00", index2Word)[:10])
 print "05 - Combinatorics: " + repr(readChiFile("chi-05", index2Word)[:10])
 print "11 - Number Theory: " + repr(readChiFile("chi-11", index2Word)[:10])
 print "35 - Partial differential equations: " + repr(readChiFile("chi-35", index2Word)[:10])
 print "51 - Geometry: " + repr(readChiFile("chi-51", index2Word)[:10])
-print "97 - Mathematics education: " + repr(readChiFile("chi-97", index2Word)[:10])"""
+print "97 - Mathematics education: " + repr(readChiFile("chi-97", index2Word)[:10])
 
 """clModel = joblib.load("gmm63-allchi2geq2000")
 log = open("clusters-gmm63-chi2geq2000", "w")

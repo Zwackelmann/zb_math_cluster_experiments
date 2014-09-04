@@ -2,11 +2,10 @@ from main.arffJson.ArffJsonCorpus import ArffJsonCorpus, ArffJsonDocument
 from sklearn.feature_selection import chi2
 import math
 from sklearn.cluster import KMeans
-from chi2_util import dumpChiScores, chiSetGeq, readChiFile
 import numpy as np
 import joblib
 import json
-from util import get_index_to_word_map
+from util import get_index_to_word_map, dumpChiScores, chiSetGeq, readChiFile
 
 corpusFilepath = "/home/simon/Projekte/MIRS/testing_java_ml_libraries/raw_vector.json"
 corpus = ArffJsonCorpus(corpusFilepath)

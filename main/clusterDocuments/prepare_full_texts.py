@@ -2,9 +2,9 @@ import sys
 from os import path
 from os import listdir
 import json
-from full_text_util import Document, DocumentParser
 from scipy.sparse import csr_matrix
-from util import save_csr_matrix, load_csr_matrix, get_dirpath, get_filenames_and_filepaths
+from util import save_csr_matrix, load_csr_matrix, get_dirpath, 
+	get_filenames_and_filepaths, Document, DocumentParser
 import time
 import uuid
 import numpy as np
