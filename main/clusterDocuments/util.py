@@ -53,6 +53,14 @@ def get_index_to_word_map(file):
 
 	return d
 
+def filesInDict(path, withPath = False):
+	filenames = [ f for f in listdir(folder) if isfile(join(folder, f))]
+
+	if withPath:
+		return map(lambda filename : join(path, filename), filenames)
+	else:
+		return filenames
+
 # utility
 def takeN(iter, n):
 	for i in xrange(n):
