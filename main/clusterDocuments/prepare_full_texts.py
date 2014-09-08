@@ -3,11 +3,13 @@ from os import path
 from os import listdir
 import json
 from scipy.sparse import csr_matrix
-from util import save_csr_matrix, load_csr_matrix, get_dirpath, 
-	get_filenames_and_filepaths, Document, DocumentParser
+from util import save_csr_matrix, load_csr_matrix, get_dirpath, get_filenames_and_filepaths, Document, DocumentParser, filesInDict
 import time
 import uuid
 import numpy as np
+import time
+import MySQLdb
+import io
 
 dirpath = get_dirpath()
 filenames, filepaths = get_filenames_and_filepaths("raw_data/ntcir_filenames")
@@ -82,15 +84,91 @@ def documents2ArffJsonInstancesCorpus(filepaths, tokens2IndexMap):
 		if "zbmath metadata" in doc.includedSources:
 			f.write(doc.toArffJsonDocument(tokens2IndexMap) + "\n")
 			f.flush()
-
 	f.close()
 
-p = DocumentParser()
-for filename, filepath in zip(filenames, filepaths)[6200:]:
-	print filename
-	doc = p.parseWithParagraphStructure(filepath)
-	np.save("derived_data/full_text_arrays/" + filename, doc)
+def numpyArr2Bin(arr):
+    out = io.BytesIO()
+    np.save(out, arr)
+    out.seek(0)
+    return buffer(out.read())
 
+def bin2NumpyArr(bin):
+ 	return np.load(io.BytesIO(bin))
+
+def connectToDb():
+	credentials = json.load(open("db_connect.json"))
+	db = MySQLdb.connect(**credentials)
+	return db
+
+documentInsertStmt = """
+INSERT INTO document(id, title, main_msc_cat, publication_date)
+VALUES
+(%(id)s, %(title)s, %(main_msc_cat)s, %(publication_date)s)
+"""
+
+formulaInsertStmt = """
+INSERT INTO formula(document, formula_id, latex, p_math_ml, c_math_ml)
+VALUES
+(%(document_id)s, %(formula_id)s, %(latex)s, %(p_math_ml)s, %(c_math_ml)s)
+"""
+
+paragraphInsertStmt = """
+INSERT INTO paragraph(document, paragraph_id, numpy_array)
+VALUES
+(%(document_id)s, %(paragraph_id)s, %(numpy_array)s)
+"""
+
+db = connectToDb()
+cursor = db.cursor()
+
+p = DocumentParser()
+# filepath = "raw_data/test_documents/07040005.xml"
+# for filename, filepath in zip(filenames, filepaths):
+for filename in filesInDict("raw_data/test_documents", True):
+	print filename
+
+	doc, tokenizedParagraphs, formulaDict = p.parseWithParagraphStructure(filename)
+
+	# info for doc table:
+	document_id = doc.arxivId()
+	publicationDate = doc.publicationDate
+	title = doc.title
+	mainMscCat = None if len(doc.zbMscCats) == 0 else doc.zbMscCats[0][:2]
+
+	documentContentMap = {
+		"id" : document_id,
+		"title" : title,
+		"main_msc_cat" : mainMscCat,
+		"publication_date" : time.strftime("%Y-%m-%d", publicationDate)
+	}
+
+	cursor.execute(documentInsertStmt, documentContentMap)
+
+	# formulas
+	for formula_id, formula in formulaDict.items():
+		formulaContentMap = {
+			"document_id" : document_id,
+			"formula_id" : formula_id,
+			"latex" : formula.latex,
+			"p_math_ml" : formula.pMathML,
+			"c_math_ml" : formula.cMathML
+		}
+
+		cursor.execute(formulaInsertStmt, formulaContentMap)
+
+	#paragraphs
+	for paragraph_id, paragraph_array in tokenizedParagraphs:
+		paragraphContentMap = {
+			"document_id" : document_id,
+			"paragraph_id" : paragraph_id,
+			"numpy_array" : numpyArr2Bin(paragraph_array)
+		}
+
+		cursor.execute(paragraphInsertStmt, paragraphContentMap)
+
+	db.commit()
+
+db.close()
 
 """
 # save word count dict
