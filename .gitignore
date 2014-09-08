@@ -4,3 +4,4 @@ raw_data/
 results/
 *.pyc
 *.swp
+db_connect.json
