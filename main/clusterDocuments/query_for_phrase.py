@@ -1,6 +1,6 @@
 import json
 from scipy.sparse import csr_matrix
-from util import save_csr_matrix, load_csr_matrix, get_dirpath, get_filenames_and_filepaths, DocumentParser
+from util import save_csr_matrix, load_csr_matrix, get_dirpath, get_filenames_and_filepaths, DocumentParser, filesInDict
 import numpy as np
 from time import time
 from main.arffJson.ArffJsonCorpus import ArffJsonCorpus, ArffJsonDocument
@@ -19,7 +19,7 @@ tokenizer = DocumentParser.TextTokenizer()
 tokens = tokenizer.tokenize(phrase)
 tokenIds = map(lambda token: translateMap[token], tokens)
 
-candidateIds = []
+"""candidateIds = []
 index = 0
 start = time()
 
@@ -38,6 +38,7 @@ print str(len(candidateInd)) + " Candidates\n"
 candidateIds = map(lambda i : row_number2fulltext_id_map[str(i)], candidateInd)
 candidateDocumentFilenames = map(lambda id : filter(lambda c : c in ascii_letters or c in digits, id) + ".xml.npy", candidateIds) 
 candidateDocumentFilepaths = map(lambda filename : join("derived_data/full_text_arrays", filename), candidateDocumentFilenames)
+"""
 
 def hasTokenSequence(sent, tokens):
 	matches = 0
@@ -52,16 +53,20 @@ def hasTokenSequence(sent, tokens):
 
 	return False
 
-for filepath in candidateDocumentFilepaths:
-	arr = np.load(filepath)
-	
-	for par in arr:
-		for sent in par:
-			if hasTokenSequence(sent, tokens):
-				print repr(par) + "\n\n"
-				break
-				
+def formulasInSentence(sent):
+	return filter(lambda token : len(token)>=2 and token[0] == "$" and token[-1] == "$", sent)
 
+def formulasInPar(par):
+	return [formula for fsent in map(lambda sent : formulasInSentence(sent), par) for formula in fsent]
+
+def formulasInDoc(doc):
+	return [formula for fpar in map(lambda par : formulasInPar(par), doc) for formula in fpar]
+
+candidateDocumentFilepaths = filesInDict("derived_data/full_text_arrays", True)[:30]
+
+formulasInDocs = map(lambda path : formulasInDoc(np.load(path)), candidateDocumentFilepaths)
+
+print "\n".join([formula for doc in formulasInDocs for formula in doc])
 
 
 
