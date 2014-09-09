@@ -8,7 +8,7 @@ from sklearn.feature_selection import chi2
 from os import listdir
 from os.path import isfile, join
 import xml.sax
-from string import ascii_letters, digits
+from string import ascii_letters, digits, printable
 from nltk.stem import WordNetLemmatizer
 from sklearn.feature_extraction.text import CountVectorizer
 import time
@@ -85,6 +85,9 @@ def rankCorrelation(chis1, chis2):
 
 	tau, p = stats.kendalltau(chis1, chis2)
 	return tau, p
+
+def asciiEscape(str):
+	return filter(lambda c : c in printable, str.encode('ascii', 'xmlcharrefreplace'))
 
 # reading and grouping
 def readDict(dictFilepath):
@@ -375,7 +378,7 @@ class DocumentParser:
 			if type(content) is DocumentParser.RawDocument.TextContent:
 				paragraphBuffer.append(content.content)
 			elif type(content) is DocumentParser.RawDocument.FormulaContent:
-				paragraphBuffer.append("#" + str(content.ident) + "#")
+				paragraphBuffer.append("<fid " + content.ident + ">")
 				formulaDict[content.ident] = content
 			elif type(content) is DocumentParser.RawDocument.Paragraph:
 				if currentParagraphId != None:
@@ -390,6 +393,8 @@ class DocumentParser:
 				raise ValueError(str(type(content)) + " is not supported")
 
 		if len(paragraphBuffer) != 0 and currentParagraphId != None:
+			paragraphString = " ".join(paragraphBuffer)
+			sentences = self.sentenceDetector.tokenize(paragraphString)
 			paragraphs.append((currentParagraphId, map(lambda s : self.tokenizeSentence(s, None), sentences)))
 
 		return rawDocument.toDocument(), paragraphs, formulaDict
@@ -398,7 +403,7 @@ class DocumentParser:
 		tokens = []
 
 		while len(sentence) != 0:
-			res = re.search(r"#[^#]+#", sentence)
+			res = re.search(r"<fid [^>]+>", sentence)
 			if res is None:
 				tokens.extend(self.textTokenizer.tokenize(sentence))
 				break
@@ -410,10 +415,8 @@ class DocumentParser:
 					formula = formulaDict.get(formulaId)
 					if not formula is None:
 						tokens.append("$" + formula.latex  + "$")
-					else:
-						tokens.append("#" + formulaId + "#")
 				else:
-					tokens.append("#" + formulaId + "#")
+					tokens.append("<fid " + formulaId + ">")
 
 				sentence = sentence[res.end():]
 		return tokens
@@ -504,11 +507,11 @@ class DocumentParser:
 			elif self.path[1] == "content":
 				if self.capturingMathState == None:
 					if name == "math":
-						self.formulaId = attrs.get('id')
-						self.latexBuffer = attrs.get('alttext')
+						self.formulaId = asciiEscape(attrs['id']) if 'id' in attrs.keys() else None
+						self.latexBuffer = asciiEscape(attrs['alttext']) if 'alttext' in attrs.keys() else None
 						self.capturingMathState = "found math tag"
 					elif len(self.path) == 3 and name == "div":
-						self.document.rawContent.append(DocumentParser.RawDocument.Paragraph(attrs['id']))
+						self.document.rawContent.append(DocumentParser.RawDocument.Paragraph(asciiEscape(attrs['id'])))
 				else:
 					if self.capturingMathState == "found math tag" and name == "semantics":
 						self.capturingMathState = "capture pmathml"
@@ -536,13 +539,14 @@ class DocumentParser:
 				pass
 
 			if name == "math":
-				formula = DocumentParser.RawDocument.FormulaContent(
-					ident = self.formulaId,
-					latex = self.latexBuffer,
-					pMathML = "<math>" + "".join(self.pMathMLBuffer) + "</math>",
-					cMathML = "<math>" + "".join(self.cMathMLBuffer) + "</math>"
-				)
-				self.document.rawContent.append(formula)
+				if self.formulaId != None:
+					formula = DocumentParser.RawDocument.FormulaContent(
+						ident = self.formulaId,
+						latex = self.latexBuffer,
+						pMathML = "<math>" + "".join(self.pMathMLBuffer) + "</math>",
+						cMathML = "<math>" + "".join(self.cMathMLBuffer) + "</math>"
+					)
+					self.document.rawContent.append(formula)
 
 				self.capturingMathState = None
 				self.formulaId = None
@@ -561,7 +565,10 @@ class DocumentParser:
 				if len(self.path) >= 2 and self.path[-2] == "identifiers" and self.path[-1] == "id":
 					self.document.identifiers[-1]['id'] = content.strip()
 				elif self.path[-1] == 'arxiv_title':
-					self.document.title = content.strip()
+					if self.document.title is None:
+						self.document.title = content.strip()
+					else:
+						self.document.title += content.strip()
 				elif self.path[-1] == 'arxiv_abstract':
 					if self.document.abstract is None:
 						self.document.abstract = content.strip()
@@ -586,9 +593,9 @@ class DocumentParser:
 						self.document.rawContent.append(DocumentParser.RawDocument.TextContent(content))
 				else:
 					if self.capturingMathState == "capture pmathml":
-						self.pMathMLBuffer.append(saxutils.escape(content.strip()).encode('ascii', 'xmlcharrefreplace'))
+						self.pMathMLBuffer.append(asciiEscape(saxutils.escape(content.strip())))
 					elif self.capturingMathState == "capture cmathml":
-						self.cMathMLBuffer.append(saxutils.escape(content.strip()).encode('ascii', 'xmlcharrefreplace'))
+						self.cMathMLBuffer.append(asciiEscape(saxutils.escape(content.strip())))
 					else:
 						pass
 

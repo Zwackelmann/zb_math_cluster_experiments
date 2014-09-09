@@ -10,6 +10,7 @@ import numpy as np
 import time
 import MySQLdb
 import io
+from string import printable
 
 dirpath = get_dirpath()
 filenames, filepaths = get_filenames_and_filepaths("raw_data/ntcir_filenames")
@@ -120,14 +121,15 @@ VALUES
 
 db = connectToDb()
 cursor = db.cursor()
+warning_log = open("warning_log", "a")
 
 p = DocumentParser()
 # filepath = "raw_data/test_documents/07040005.xml"
-# for filename, filepath in zip(filenames, filepaths):
-for filename in filesInDict("raw_data/test_documents", True):
-	print filename
+# for filename in filesInDict("raw_data/test_documents", True):
+for filename, filepath in zip(filenames, filepaths):
+	sys.stdout.write("processing " + filename + "... ")
 
-	doc, tokenizedParagraphs, formulaDict = p.parseWithParagraphStructure(filename)
+	doc, tokenizedParagraphs, formulaDict = p.parseWithParagraphStructure(filepath)
 
 	# info for doc table:
 	document_id = doc.arxivId()
@@ -144,6 +146,7 @@ for filename in filesInDict("raw_data/test_documents", True):
 
 	cursor.execute(documentInsertStmt, documentContentMap)
 
+	formula_id_set = set()
 	# formulas
 	for formula_id, formula in formulaDict.items():
 		formulaContentMap = {
@@ -153,7 +156,6 @@ for filename in filesInDict("raw_data/test_documents", True):
 			"p_math_ml" : formula.pMathML,
 			"c_math_ml" : formula.cMathML
 		}
-
 		cursor.execute(formulaInsertStmt, formulaContentMap)
 
 	#paragraphs
@@ -163,10 +165,11 @@ for filename in filesInDict("raw_data/test_documents", True):
 			"paragraph_id" : paragraph_id,
 			"numpy_array" : numpyArr2Bin(paragraph_array)
 		}
-
+		
 		cursor.execute(paragraphInsertStmt, paragraphContentMap)
-
+		
 	db.commit()
+	sys.stdout.write("SUCCESS\n")	
 
 db.close()
 
