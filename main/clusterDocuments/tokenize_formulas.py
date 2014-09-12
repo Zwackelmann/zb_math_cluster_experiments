@@ -1,6 +1,7 @@
 from util import connectToDb
 import xml.sax
 from xml.sax import saxutils
+import json
 
 class CMathMlTokenizer(xml.sax.ContentHandler):
 	def __init__(self, featureMap):
@@ -57,19 +58,29 @@ documentIds = []
 for row in cursor:
 	documentIds.append(row[0])
 
-cursor.execute("""
-	SELECT c_math_ml 
-	FROM formula
-	WHERE document = %(document_id)s
-""", {"document_id" : "0704.0005"}
-)
+for documentId in documentIds:
+	print documentId
+	
+	cursor.execute("""
+		SELECT formula_id, c_math_ml 
+		FROM formula
+		WHERE document = %(document_id)s
+	""", {"document_id" : documentId}
+	)
 
-formula = None
-for row in cursor:
-	formula = row[0]
+	formulaFeatureMap = { }
+	for row in cursor:
+		formulaId = row[0]
+		formulaCMathMl = row[1]
 
-	featureMap = { }
-	ch = CMathMlTokenizer(featureMap)
-	xml.sax.parseString(formula, ch)
+		featureMap = { }
+		ch = CMathMlTokenizer(featureMap)
+		xml.sax.parseString(formulaCMathMl, ch)
 
-print featureMap
+		formulaFeatureMap[formulaId] = featureMap
+
+	f = open("derived_data/formula_features/" + formulaId + ".json")
+	f.write(json.dumps(formulaFeatureMap))
+	f.close()
+
+db.close()
