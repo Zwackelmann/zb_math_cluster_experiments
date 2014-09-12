@@ -60,7 +60,7 @@ for row in cursor:
 
 for documentId in documentIds:
 	print documentId
-	
+
 	cursor.execute("""
 		SELECT formula_id, c_math_ml 
 		FROM formula
@@ -79,7 +79,7 @@ for documentId in documentIds:
 
 		formulaFeatureMap[formulaId] = featureMap
 
-	f = open("derived_data/formula_features/" + formulaId + ".json")
+	f = open("derived_data/formula_features/" + formulaId + ".json", "w")
 	f.write(json.dumps(formulaFeatureMap))
 	f.close()
 
