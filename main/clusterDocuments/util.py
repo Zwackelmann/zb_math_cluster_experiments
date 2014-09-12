@@ -16,8 +16,15 @@ import nltk
 import re
 from xml.sax import saxutils
 from datetime import date
+import json
+import MySQLdb
 
-# general 
+# general
+def connectToDb():
+	credentials = json.load(open("db_connect.json"))
+	db = MySQLdb.connect(**credentials)
+	return db
+
 def get_dirpath():
 	if uuid.getnode() == 161338626918L: # is69
 		dirpath = "/raid0/barthel/data/NTCIR_2014_enriched/"
@@ -73,17 +80,22 @@ def printBestN(dict, n):
 	sortedBestN = sorted(bestN, key=lambda x: int(x[0]))
 	return "\n".join(map(lambda x: repr(x), sortedBestN))
 	
-def rankCorrelation(chis1, chis2):
+def wordListRankCorrelation(chis1, chis2):
 	chiTerms1 = set(map(lambda x : x[0], chis1))
 	chiTerms2 = set(map(lambda x : x[0], chis2))
 
-	in2ButNotIn1 = map(lambda x : (x, 0.0), list(chiTerms2.difference(chiTerms1)))
-	in1ButNotIn2 = map(lambda x : (x, 0.0), list(chiTerms1.difference(chiTerms2)))
+	allTerms = chiTerms1.union(chiTerms2)
+	termDict = dict(zip(allTerms, range(len(allTerms))))
 
-	chis1.extend(in2ButNotIn1)
-	chis2.extend(in1ButNotIn2)
+	chiList1 = [0.0] * len(allTerms)
+	chiList2 = [0.0] * len(allTerms)
 
-	tau, p = stats.kendalltau(chis1, chis2)
+	for term, score in chis1:
+		chiList1[termDict[term]] = score
+	for term, score in chis2:
+		chiList2[termDict[term]] = score
+
+	tau, p = stats.spearmanr(chiList1, chiList2)
 	return tau, p
 
 def asciiEscape(str):
@@ -665,3 +677,47 @@ class DocumentParser:
 	FormulaTokenizer.consciously_ignored = '{},. %\n:~;$&?`"?@'
 	FormulaTokenizer.valid_special_chars = '+-*/_|[]()!<>=^'
 	FormulaTokenizer.letters_and_special_chars = ascii_letters + FormulaTokenizer.valid_special_chars + digits
+
+# plotting
+def hist(x, bounds):
+    bins = { }
+
+    for val in x:
+        if val >= bounds[0]:
+            for i in range(0, len(bounds)-1):
+                if val < bounds[i+1]:
+                    bins[i] = bins.get(i, 0) + 1
+                    break
+
+    labels = []
+    for i in range(0, len(bounds)-1):
+        lowerBound = bounds[i]
+        upperBound = bounds[i+1] - 1
+
+        if(lowerBound == upperBound):
+            labels.append(str(lowerBound))
+        else:
+            labels.append(str(lowerBound) + " - " + str(upperBound))
+
+    values = map(lambda x: x[1], sorted(bins.items(), key=lambda x: x[0]))
+
+    return labels, values
+
+def barPlot(plt, labels, valueLists, colors = ['r', 'b', 'y', 'm'], width = 0.6):
+    numLists = len(valueLists)
+    totalBars = len(valueLists[0])
+    ind = np.arange(totalBars)
+
+    rects = []
+    ax = plt.axes()
+    for values, i in zip(valueLists, range(len(valueLists))):
+    	r = ax.bar(left=ind+((0.5-(width/2)))+i*(width/numLists), height=values, width=width/numLists, color=colors[i % len(colors)] )
+    	rects.append(r)
+
+    ax.set_xticks(ind+0.5)
+    ax.set_xticklabels(labels)
+
+    ax.set_ylabel('#Categories')
+    ax.set_xlabel('Best Jaccards (in %)')
+
+    return rects
