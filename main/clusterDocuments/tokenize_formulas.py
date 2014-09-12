@@ -79,7 +79,7 @@ for documentId in documentIds:
 
 		formulaFeatureMap[formulaId] = featureMap
 
-	f = open("derived_data/formula_features/" + formulaId + ".json", "w")
+	f = open("derived_data/formula_features/" + documentId + ".json", "w")
 	f.write(json.dumps(formulaFeatureMap))
 	f.close()
 
