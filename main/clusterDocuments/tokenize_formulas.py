@@ -2,6 +2,7 @@ from util import connectToDb
 import xml.sax
 from xml.sax import saxutils
 import json
+from string import digits, ascii_characters
 
 class CMathMlTokenizer(xml.sax.ContentHandler):
 	def __init__(self, featureMap):
@@ -79,7 +80,7 @@ for documentId in documentIds:
 
 		formulaFeatureMap[formulaId] = featureMap
 
-	f = open("derived_data/formula_features/" + documentId + ".json", "w")
+	f = open("derived_data/formula_features/" + filter(lambda c : c in ascii_characters or c in digits, documentId) + ".json", "w")
 	f.write(json.dumps(formulaFeatureMap))
 	f.close()
 
