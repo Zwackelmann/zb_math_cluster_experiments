@@ -107,18 +107,17 @@ if __name__ == "__main__":
     files = filesInDict("derived_data/formula_features", True)
     formulaFeatureMaps = map(lambda file : json.load(open(file)), files)
 
-    distinctTokens = set()
+    tokenCounts = { }
     for fMap in formulaFeatureMaps:
-        distinctTokens.update(aggregateFormulaFeatureMaps(
+    	addToDict(tokenCounts, aggregateFormulaFeatureMaps(
             fMap = fMap,
             onlyTheorems = True,
             ignoreNumbers = False
-        ).keys())
+    	))
 
-    token2IndexMap = dict(zip(sorted(distinctTokens), range(len(distinctTokens))))
-    f = open("derived_data/theorem_formula_terms2index_map.json", "w")
-    f.write(json.dumps(token2IndexMap))
+    # token2IndexMap = dict(zip(sorted(distinctTokens), range(len(distinctTokens))))
+    f = open("derived_data/theorem_formula_token_counts.json", "w")
+    f.write(json.dumps(tokenCounts))
     f.close()
-    
 
     # create raw csr_matrix for theorem formulas
