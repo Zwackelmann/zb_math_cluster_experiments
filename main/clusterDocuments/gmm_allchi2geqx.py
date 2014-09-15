@@ -39,7 +39,7 @@ print "97 - Mathematics education: " + repr(readChiFile("chi-97", index2Word)[:1
 log = open("clusters-gmm63-chi2geq2000", "w")
 count = 0
 for doc in corpus:
-	npArray = sparseData2Matrix(doc.data, len(index2chiIndex), index2chiIndex)
-	log.write(doc.id + ";" + str(clModel.predict(npArray)[0]) + "\n")
-	count += 1
+    npArray = sparseData2Matrix(doc.data, len(index2chiIndex), index2chiIndex)
+    log.write(doc.id + ";" + str(clModel.predict(npArray)[0]) + "\n")
+    count += 1
 log.close()"""

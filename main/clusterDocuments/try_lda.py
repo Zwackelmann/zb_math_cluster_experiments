@@ -24,7 +24,7 @@ joblib.dump(km, "km63-sklean_lsi250")
 log = open("foo", "w")
 count = 0
 for arr in LSI_TDM:
-	# npArray = sparseData2Matrix(doc.data, len(index2chiIndex), index2chiIndex)
-	log.write(doc.id + ";" + str(clModel.predict(npArray)[0]) + "\n")
-	count += 1
+    # npArray = sparseData2Matrix(doc.data, len(index2chiIndex), index2chiIndex)
+    log.write(doc.id + ";" + str(clModel.predict(npArray)[0]) + "\n")
+    count += 1
 log.close()"""

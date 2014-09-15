@@ -28,10 +28,10 @@ m = tdm[:,tokenIds]
 candidateInd = [ ]
 currInd = 0
 for i in range(len(m.indptr)-1):
-	diff = m.indptr[i+1] - m.indptr[i]
-	if diff == len(tokenIds):
-		candidateInd.append(currInd)
-	currInd += 1
+    diff = m.indptr[i+1] - m.indptr[i]
+    if diff == len(tokenIds):
+        candidateInd.append(currInd)
+    currInd += 1
 
 print str(len(candidateInd)) + " Candidates\n"
 
@@ -41,26 +41,26 @@ candidateDocumentFilepaths = map(lambda filename : join("derived_data/full_text_
 """
 
 def hasTokenSequence(sent, tokens):
-	matches = 0
-	for token in sent:
-		if token == tokens[matches]:
-			matches += 1
-		else:
-			matches = 0
-		
-		if matches == len(tokens):
-			return True
+    matches = 0
+    for token in sent:
+        if token == tokens[matches]:
+            matches += 1
+        else:
+            matches = 0
+        
+        if matches == len(tokens):
+            return True
 
-	return False
+    return False
 
 def formulasInSentence(sent):
-	return filter(lambda token : len(token)>=2 and token[0] == "$" and token[-1] == "$", sent)
+    return filter(lambda token : len(token)>=2 and token[0] == "$" and token[-1] == "$", sent)
 
 def formulasInPar(par):
-	return [formula for fsent in map(lambda sent : formulasInSentence(sent), par) for formula in fsent]
+    return [formula for fsent in map(lambda sent : formulasInSentence(sent), par) for formula in fsent]
 
 def formulasInDoc(doc):
-	return [formula for fpar in map(lambda par : formulasInPar(par), doc) for formula in fpar]
+    return [formula for fpar in map(lambda par : formulasInPar(par), doc) for formula in fpar]
 
 candidateDocumentFilepaths = filesInDict("derived_data/full_text_arrays", True)[:30]
 

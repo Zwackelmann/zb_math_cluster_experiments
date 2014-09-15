@@ -30,7 +30,7 @@ class ArffJsonCorpus:
             numDocs = 0
             for doc in iter(self):
                 if selection is None or selection(doc):
-		    numDocs += 1
+                    numDocs += 1
                     for key, val in doc.data:
                         row.append(numDocs-1)
                         col.append(key)
