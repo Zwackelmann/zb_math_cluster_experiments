@@ -109,11 +109,11 @@ if __name__ == "__main__":
 
     tokenCounts = { }
     for fMap in formulaFeatureMaps:
-    	addToDict(tokenCounts, aggregateFormulaFeatureMaps(
+        addToDict(tokenCounts, aggregateFormulaFeatureMaps(
             fMap = fMap,
             onlyTheorems = True,
             ignoreNumbers = False
-    	))
+        ))
 
     f = open("derived_data/theorem_formula_token_counts.json", "w")
     f.write(json.dumps(tokenCounts))
@@ -131,16 +131,16 @@ if __name__ == "__main__":
     f.close()
 
     # create raw csr_matrix for theorem formulas
-	token2IndexMap = json.load(open("derived_data/theorem_formula_token2index_map.json"))
-	formulaFeatureMaps = map(lambda file : json.load(open(file)), files)
-	
-	l = []
-	for fMap in formulaFeatureMaps:
-		l.append(aggregateFormulaFeatureMaps(
+    token2IndexMap = json.load(open("derived_data/theorem_formula_token2index_map.json"))
+    formulaFeatureMaps = map(lambda file : json.load(open(file)), files)
+    
+    l = []
+    for fMap in formulaFeatureMaps:
+        l.append(aggregateFormulaFeatureMaps(
             fMap = fMap,
             onlyTheorems = True,
             ignoreNumbers = False
-    	))
+        ))
 
-	build_csr_matrix(l, token2IndexMap)
+    build_csr_matrix(l, token2IndexMap)
 
