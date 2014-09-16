@@ -1,9 +1,11 @@
-from util import connectToDb, getAllDocumentIds, filesInDict, build_csr_matrix, save_csr_matrix
+from util import connectToDb, getAllDocumentIds, filesInDict, build_csr_matrix, save_csr_matrix, load_csr_matrix
 import xml.sax
 from xml.sax import saxutils
 import json
 from string import digits, ascii_letters
 import re
+from sklearn.feature_extraction.text import TfidfTransformer
+import joblib
 
 class CMathMlTokenizer(xml.sax.ContentHandler):
     def __init__(self, featureMap):
@@ -127,11 +129,11 @@ if __name__ == "__main__":
     token2IndexMap = dict(zip(sorted(frequentTokens), range(len(frequentTokens))))
 
     f = open("derived_data/theorem_formula_token2index_map.json", "w")
-    f.write(json.dumps(tokenCounts))
+    f.write(json.dumps(token2IndexMap))
     f.close()"""
 
     # create raw csr_matrix for theorem formulas
-    files = filesInDict("derived_data/formula_features", True)
+    """files = filesInDict("derived_data/formula_features", True)
     token2IndexMap = json.load(open("derived_data/theorem_formula_token2index_map.json"))
     formulaFeatureMaps = map(lambda file : json.load(open(file)), files)
     
@@ -144,10 +146,12 @@ if __name__ == "__main__":
         ))
 
     m = build_csr_matrix(l, token2IndexMap)
-    save_csr_matrix(m, "derived_data/raw_formula_tdf")
+    save_csr_matrix(m, "derived_data/raw_formula_tdf")"""
 
 
     # train and dump tf-idf model for formulas
-    """TDM_full_text = load_csr_matrix("derived_data/zb_math_full_text_tdm.npz")
+    """raw_formula_tdf = load_csr_matrix("derived_data/raw_formula_tdf.npz")
     tfidf_trans = TfidfTransformer()
-    tfidf_trans.fit(TDM_full_text)"""
+    tfidf_trans.fit(raw_formula_tdf)
+
+    joblib.dump(tfidf_trans, "models/raw_formula_tfidf_model")"""

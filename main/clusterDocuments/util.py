@@ -65,11 +65,15 @@ def build_csr_matrix(listOfMaps, token2IndexMap):
     numDocs = 0
     for m in listOfMaps:
         numDocs += 1
-        for key, val in m.items():
-            if key in token2IndexMap:
-                row.append(numDocs-1)
-                col.append(token2IndexMap[key])
-                data.append(val)
+
+        tokensInDict = filter(lambda kv: kv[0] in token2IndexMap, m.items())
+        translatedTokens = map(lambda kv: (token2IndexMap[kv[0]], kv[1]), tokensInDict)
+        sortedTokens = sorted(translatedTokens, key=lambda x: x[0])
+
+        for key, val in sortedTokens:
+            row.append(numDocs-1)
+            col.append(key)
+            data.append(val)
 
     shapeRows = numDocs
     shapeCols = len(token2IndexMap)
