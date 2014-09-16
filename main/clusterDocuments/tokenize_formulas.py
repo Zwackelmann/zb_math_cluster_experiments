@@ -1,4 +1,4 @@
-from util import connectToDb, getAllDocumentIds, filesInDict
+from util import connectToDb, getAllDocumentIds, filesInDict, build_csr_matrix
 import xml.sax
 from xml.sax import saxutils
 import json
@@ -103,8 +103,8 @@ if __name__ == "__main__":
 
     db.close()"""
 
-    # build formula token dict
-    files = filesInDict("derived_data/formula_features", True)
+    # calc formula token counts
+    """files = filesInDict("derived_data/formula_features", True)
     formulaFeatureMaps = map(lambda file : json.load(open(file)), files)
 
     tokenCounts = { }
@@ -115,9 +115,32 @@ if __name__ == "__main__":
             ignoreNumbers = False
     	))
 
-    # token2IndexMap = dict(zip(sorted(distinctTokens), range(len(distinctTokens))))
     f = open("derived_data/theorem_formula_token_counts.json", "w")
+    f.write(json.dumps(tokenCounts))
+    f.close()"""
+
+    # build formula token dict
+    minTokenCount = 5
+
+    tokenCounts = json.load(open("derived_data/theorem_formula_token_counts.json"))
+    frequentTokens = map(lambda i: i[0], filter(lambda c : c[1] >= minTokenCount, tokenCounts.items()))
+    token2IndexMap = dict(zip(sorted(frequentTokens), range(len(frequentTokens))))
+
+    f = open("derived_data/theorem_formula_token2index_map.json", "w")
     f.write(json.dumps(tokenCounts))
     f.close()
 
     # create raw csr_matrix for theorem formulas
+	token2IndexMap = json.load(open("derived_data/theorem_formula_token2index_map.json"))
+	formulaFeatureMaps = map(lambda file : json.load(open(file)), files)
+	
+	l = []
+	for fMap in formulaFeatureMaps:
+		l.append(aggregateFormulaFeatureMaps(
+            fMap = fMap,
+            onlyTheorems = True,
+            ignoreNumbers = False
+    	))
+
+	build_csr_matrix(l, token2IndexMap)
+

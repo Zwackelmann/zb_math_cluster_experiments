@@ -57,7 +57,7 @@ def load_csr_matrix(filename):
     return csr_matrix( (loader['data'], loader['indices'], loader['indptr']),
                          shape=loader['shape'])
 
-def build_csr_matrix(listOfMaps, key2Index):
+def build_csr_matrix(listOfMaps, token2IndexMap):
     row = []
     col = []
     data = []
@@ -66,12 +66,13 @@ def build_csr_matrix(listOfMaps, key2Index):
     for m in listOfMaps:
         numDocs += 1
         for key, val in m.items():
-            row.append(numDocs-1)
-            col.append(key)
-            data.append(val)
+            if key in token2IndexMap:
+                row.append(numDocs-1)
+                col.append(token2IndexMap[key])
+                data.append(val)
 
     shapeRows = numDocs
-    shapeCols = len(key2Index)
+    shapeCols = len(token2IndexMap)
 
     return csr_matrix( (data,(row,col)), shape=(shapeRows, shapeCols) )
 
