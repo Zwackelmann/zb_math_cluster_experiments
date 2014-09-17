@@ -91,44 +91,46 @@ def horizontally_combine_matrixes(matrixList):
 
     return csr_matrix((np.array(newData), np.array(newIndices), np.array(newIndptr)), shape=(numRows, numCols))
 
-db = connectToDb()
-cursor = db.cursor()
-documentIds = getAllDocumentIds(cursor)
+if __name__ == "__main__":
+    db = connectToDb()
+    cursor = db.cursor()
+    documentIds = getAllDocumentIds(cursor)
 
-matrixList = [ ]
-count = 0
-for documentId in documentIds:
-    print "read " + str(count) + " documents" 
-    pars = getParsFromDocument(documentId, cursor)
+    matrixList = [ ]
+    count = 0
+    for documentId in documentIds:
+        print "read " + str(count) + " documents" 
+        pars = getParsFromDocument(documentId, cursor)
 
-    # get text feature map
-    textFeatureCounts = parsToFeatureCounts(
-        pars = pars,
-        onlyTheorems = True
-    )
+        # get text feature map
+        textFeatureCounts = parsToFeatureCounts(
+            pars = pars,
+            onlyTheorems = True
+        )
 
-    # get formula feature map
-    formulaIds = getFormulaIdsFromPars(
-        pars = pars,
-        onlyTheorems = True
-    )
+        # get formula feature map
+        formulaIds = getFormulaIdsFromPars(
+            pars = pars,
+            onlyTheorems = True
+        )
 
-    formulaFeatureCounts = formulasToFeatureCounts(formulaIds)
+        formulaFeatureCounts = formulasToFeatureCounts(formulaIds)
 
-    textFeatures = processFeatureCounts(
-        featureCounts = textFeatureCounts, 
-        token2Id = json.load(open("derived_data/theorem_text_token2index_map.json")),
-        tfidfModel = joblib.load("models/raw_theorem_text_tfidf_model")
-    )
+        textFeatures = processFeatureCounts(
+            featureCounts = textFeatureCounts, 
+            token2Id = json.load(open("derived_data/theorem_text_token2index_map.json")),
+            tfidfModel = joblib.load("models/raw_theorem_text_tfidf_model")
+        )
 
-    formulaFeatures = processFeatureCounts(
-        featureCounts = formulaFeatureCounts, 
-        token2Id = json.load(open("derived_data/theorem_formula_token2index_map.json")),
-        tfidfModel = joblib.load("models/raw_formula_tfidf_model")
-    )
+        formulaFeatures = processFeatureCounts(
+            featureCounts = formulaFeatureCounts, 
+            token2Id = json.load(open("derived_data/theorem_formula_token2index_map.json")),
+            tfidfModel = joblib.load("models/raw_formula_tfidf_model")
+        )
 
-    combinedFeatures = vertically_append_matrix(textFeatures, formulaFeatures)
-    matrixList.append(combinedFeatures)
+        combinedFeatures = vertically_append_matrix(textFeatures, formulaFeatures)
+        matrixList.append(combinedFeatures)
 
-theoremTDM = horizontally_combine_matrixes(matrixList)
-save_csr_matrix(theoremTDM, "derived_data/combined_theorem_text_formula_tdm")
+    theoremTDM = horizontally_combine_matrixes(matrixList)
+    save_csr_matrix(theoremTDM, "derived_data/combined_theorem_text_formula_tdm")
+        
