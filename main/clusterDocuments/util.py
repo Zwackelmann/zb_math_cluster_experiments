@@ -58,18 +58,32 @@ def load_csr_matrix(filename):
     return csr_matrix( (loader['data'], loader['indices'], loader['indptr']),
                          shape=loader['shape'])
 
-def build_csr_matrix(listOfMaps, token2IndexMap):
+def build_csr_matrix(listOfMaps, token2IndexMap = None, numAttributes = None):
+    if token2IndexMap is None and numAttributes is None:
+        raise ValueError("either token2IndexMap or numAttributes must be set")
+    elif (not token2IndexMap is None) and (not numAttributes is None):
+        raise ValueError("token2IndexMap and numAttributes cannot both be set")
+    else:
+        pass
+
     row = []
     col = []
     data = []
 
     i = 0
     for m in listOfMaps:
-        tokensInDict = filter(lambda kv: kv[0] in token2IndexMap, m.items())
-        translatedTokens = map(lambda kv: (token2IndexMap[kv[0]], kv[1]), tokensInDict)
-        sortedTokens = sorted(translatedTokens, key=lambda x: x[0])
+        numericalSortedTokens = None
 
-        for key, val in sortedTokens:
+        if not token2IndexMap is None:
+            tokensInDict = filter(lambda kv: kv[0] in token2IndexMap, m.items())
+            translatedTokens = map(lambda kv: (token2IndexMap[kv[0]], kv[1]), tokensInDict)
+            numericalSortedTokens = sorted(translatedTokens, key=lambda x: x[0])
+        elif not numAttributes is None:
+            numericalSortedTokens = sorted(m.items(), key=lambda x: x[0])
+        else:
+            raise ValueError("Invalid case while building csr_matrix")
+
+        for key, val in numericalSortedTokens:
             row.append(i)
             col.append(key)
             data.append(val)
@@ -77,7 +91,13 @@ def build_csr_matrix(listOfMaps, token2IndexMap):
         i += 1
 
     shapeRows = len(listOfMaps)
-    shapeCols = len(token2IndexMap)
+    shapeCols = None
+    if not token2IndexMap is None:
+        shapeCols = len(token2IndexMap)
+    elif not numAttributes is None:
+        shapeCols = numAttributes
+    else:
+        raise ValueError("Invalid case while building csr_matrix")
 
     return csr_matrix( (data,(row,col)), shape=(shapeRows, shapeCols) )
 

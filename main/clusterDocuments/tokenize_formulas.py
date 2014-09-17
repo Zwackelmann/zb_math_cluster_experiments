@@ -139,7 +139,7 @@ if __name__ == "__main__":
             ignoreNumbers = False
         ))
 
-    m = build_csr_matrix(l, token2IndexMap)
+    m = build_csr_matrix(listOfMaps=l, token2IndexMap=token2IndexMap)
     save_csr_matrix(m, "derived_data/raw_formula_tdf")"""
 
     # train and dump tf-idf model for formulas

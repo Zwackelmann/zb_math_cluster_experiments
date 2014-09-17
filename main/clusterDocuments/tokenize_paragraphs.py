@@ -92,7 +92,7 @@ if __name__ == "__main__":
         l.append(featureMap)
         count += 1
 
-    m = build_csr_matrix(l, token2IndexMap)
+    m = build_csr_matrix(listOfMaps=l, token2IndexMap=token2IndexMap)
     save_csr_matrix(m, "derived_data/raw_theorem_text_tdm")"""
 
     # train and dump tf-idf model for theorem texts
