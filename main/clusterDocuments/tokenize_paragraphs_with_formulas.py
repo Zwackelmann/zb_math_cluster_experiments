@@ -8,6 +8,7 @@ from tokenize_paragraphs import getParsFromDocument, parsToFeatureCounts
 from sklearn.preprocessing import Normalizer
 from scipy.sparse import csr_matrix
 import numpy as np
+from sklearn.decomposition import TruncatedSVD
 
 def getFormulaIdsFromPars(pars, onlyTheorems):
     thmPars = None
@@ -138,9 +139,27 @@ if __name__ == "__main__":
     save_csr_matrix(theoremTDM, "derived_data/combined_theorem_text_formula_tdm")"""
 
     # train lsa
-    theoremTDM = load_csr_matrix("derived_data/combined_theorem_text_formula_tdm")
+    """theoremTDM = load_csr_matrix("derived_data/combined_theorem_text_formula_tdm.npz")
 
     svd = TruncatedSVD(n_components=250)
     svd.fit(theoremTDM)
-    joblib.dump(svd, "derived_data/combined_theorem_text_formula_lsi250_model")
-        
+    joblib.dump(svd, "models/combined_theorem_text_formula_lsi250_model")
+    """
+
+    # perform clustering
+    theoremTDM = load_csr_matrix("derived_data/combined_theorem_text_formula_tdm.npz")
+    svd = joblib.load("models/combined_theorem_text_formula_lsi250_model")
+    LSI_TDM = svd.transform(theoremTDM)
+
+    ap = AffinityPropagation(
+        damping=0.5, 
+        max_iter=200, 
+        convergence_iter=15, 
+        copy=True, 
+        preference=None, 
+        affinity='euclidean', 
+        verbose=False
+    )
+
+    ap.fit(LSI_TDM)
+    joblib.dump(ap, "models/combined_theorem_text_formula_ap_model")
