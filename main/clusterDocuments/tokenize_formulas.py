@@ -1,4 +1,4 @@
-from util import connectToDb, getAllDocumentIds, filesInDict, build_csr_matrix, save_csr_matrix, load_csr_matrix
+from util import connectToDb, getAllDocumentIds, filesInDict, build_csr_matrix, save_csr_matrix, load_csr_matrix, addToDict, numpyArr2Bin, bin2NumpyArr
 import xml.sax
 from xml.sax import saxutils
 import json
@@ -73,12 +73,6 @@ def prepareFormulaFeaturesForDocument(dbCursor, documentId):
 
     return formulaFeatureMap
 
-def addToDict(dict1, dict2):
-    for k, v in dict2.items():
-        if not k in dict1:
-            dict1[k] = 0
-        dict1[k] += v
-
 def aggregateFormulaFeatureMaps(fMap, onlyTheorems, ignoreNumbers):
     documentFeatureMap = { }
     for fid, features in fMap.items():
@@ -147,7 +141,6 @@ if __name__ == "__main__":
 
     m = build_csr_matrix(l, token2IndexMap)
     save_csr_matrix(m, "derived_data/raw_formula_tdf")"""
-
 
     # train and dump tf-idf model for formulas
     """raw_formula_tdf = load_csr_matrix("derived_data/raw_formula_tdf.npz")

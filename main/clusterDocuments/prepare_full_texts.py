@@ -3,7 +3,7 @@ from os import path
 from os import listdir
 import json
 from scipy.sparse import csr_matrix
-from util import save_csr_matrix, load_csr_matrix, get_dirpath, get_filenames_and_filepaths, Document, DocumentParser, filesInDict, connectToDb
+from util import save_csr_matrix, load_csr_matrix, get_dirpath, get_filenames_and_filepaths, Document, DocumentParser, filesInDict, connectToDb, numpyArr2Bin, bin2NumpyArr
 import time
 import uuid
 import numpy as np
@@ -85,15 +85,6 @@ def documents2ArffJsonInstancesCorpus(filepaths, tokens2IndexMap):
             f.write(doc.toArffJsonDocument(tokens2IndexMap) + "\n")
             f.flush()
     f.close()
-
-def numpyArr2Bin(arr):
-    out = io.BytesIO()
-    np.save(out, arr)
-    out.seek(0)
-    return buffer(out.read())
-
-def bin2NumpyArr(bin):
-     return np.load(io.BytesIO(bin))
 
 documentInsertStmt = """
 INSERT INTO document(id, title, main_msc_cat, publication_date)

@@ -18,6 +18,7 @@ from xml.sax import saxutils
 from datetime import date
 import json
 import MySQLdb
+import io
 
 # file system
 def get_dirpath():
@@ -62,20 +63,20 @@ def build_csr_matrix(listOfMaps, token2IndexMap):
     col = []
     data = []
 
-    numDocs = 0
+    i = 0
     for m in listOfMaps:
-        numDocs += 1
-
         tokensInDict = filter(lambda kv: kv[0] in token2IndexMap, m.items())
         translatedTokens = map(lambda kv: (token2IndexMap[kv[0]], kv[1]), tokensInDict)
         sortedTokens = sorted(translatedTokens, key=lambda x: x[0])
 
         for key, val in sortedTokens:
-            row.append(numDocs-1)
+            row.append(i)
             col.append(key)
             data.append(val)
 
-    shapeRows = numDocs
+        i += 1
+
+    shapeRows = len(listOfMaps)
     shapeCols = len(token2IndexMap)
 
     return csr_matrix( (data,(row,col)), shape=(shapeRows, shapeCols) )
@@ -95,7 +96,19 @@ def getAllDocumentIds(cursor):
 
     return documentIds
 
+def numpyArr2Bin(arr):
+    out = io.BytesIO()
+    np.save(out, arr)
+    out.seek(0)
+    return buffer(out.read())
+
+def bin2NumpyArr(bin):
+     return np.load(io.BytesIO(bin))
+
 # utility
+def flatten(l):
+    return [item for sublist in l for item in sublist]
+
 def takeN(iter, n):
     for i in xrange(n):
         yield iter.next()
@@ -125,6 +138,12 @@ def wordListRankCorrelation(chis1, chis2):
 
 def asciiEscape(str):
     return filter(lambda c : c in printable, str.encode('ascii', 'xmlcharrefreplace'))
+
+def addToDict(dict1, dict2):
+    for k, v in dict2.items():
+        if not k in dict1:
+            dict1[k] = 0
+        dict1[k] += v
 
 # group documents (by cluster or category)
 def get_index_to_word_map(file):
@@ -460,7 +479,7 @@ class DocumentParser:
             else:
                 tokens.extend(self.textTokenizer.tokenize(sentence[:res.start()]))
                 
-                formulaId = sentence[res.start()+1:res.end()-1]
+                formulaId = sentence[res.start()+5:res.end()-1]
                 if not formulaDict is None:
                     formula = formulaDict.get(formulaId)
                     if not formula is None:
