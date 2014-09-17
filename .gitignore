@@ -2,6 +2,7 @@ derived_data/
 models/
 raw_data/
 results/
+notes/
 *.pyc
 *.swp
 db_connect.json
