@@ -92,7 +92,8 @@ def horizontally_combine_matrixes(matrixList):
     return csr_matrix((np.array(newData), np.array(newIndices), np.array(newIndptr)), shape=(numRows, numCols))
 
 if __name__ == "__main__":
-    db = connectToDb()
+    # combine text with formula features
+    """db = connectToDb()
     cursor = db.cursor()
     documentIds = getAllDocumentIds(cursor)
 
@@ -131,6 +132,15 @@ if __name__ == "__main__":
         combinedFeatures = vertically_append_matrix(textFeatures, formulaFeatures)
         matrixList.append(combinedFeatures)
 
+        count += 1
+
     theoremTDM = horizontally_combine_matrixes(matrixList)
-    save_csr_matrix(theoremTDM, "derived_data/combined_theorem_text_formula_tdm")
+    save_csr_matrix(theoremTDM, "derived_data/combined_theorem_text_formula_tdm")"""
+
+    # train lsa
+    theoremTDM = load_csr_matrix("derived_data/combined_theorem_text_formula_tdm")
+
+    svd = TruncatedSVD(n_components=250)
+    svd.fit(theoremTDM)
+    joblib.dump(svd, "derived_data/combined_theorem_text_formula_lsi250_model")
         
