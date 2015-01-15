@@ -50,8 +50,8 @@ if __name__ == "__main__":
 
     importantWords = dict(map(lambda x : (x[0], ", ".join(map(lambda x: str(x[0]), x[1][:100]))), bestChisClu.items()))"""
 
-    category2Documents = groupCorpusDocuments("/home/simon/Projekte/MIRS/zb_math_cluster_experiments/raw_data/raw_vector.json", 1)
-    cluster2Documents = groupClusterDocuments("results/clusters-gmm-sklean_lsi250")
+    category2Documents = groupCorpusDocuments("raw_data/raw_vector.json", 1)
+    cluster2Documents = groupClusterDocuments("results/clusters-gmm-raw_vector-lsi250")
     jaccForClu, jaccForCat, portForClu, portForCat, numDocsPerClu, numDocsPerCat = clusterStats(category2Documents, cluster2Documents)
 
     totalDocsInClu = sum(map(lambda x : int(x[1]), numDocsPerClu.items()))
@@ -63,11 +63,13 @@ if __name__ == "__main__":
     # plot distributions
     plt.figure(num=None, figsize=(8, 4), dpi=80, facecolor='w', edgecolor='k')
     maxJaccs = map(lambda v: max(v), map(lambda kv: map(lambda x: x[1], kv[1]), jaccForCat.items()))
-    jaccLabels, jaccValues = hist(maxJaccs, [0.0, 0.05, 0.1, 0.15, 0.20, 1.0])
-    # labelsClu, valuesClu = hist(portionsInClu, [0, 1, 2, 3, 4, 5, 100])
-    rects = barPlot(plt=plt, labels=["<5%", "5-10%", "10-15%", "15-20%", ">20%"], valueLists=[jaccValues], width=0.5)
+    # jaccLabels, jaccValues = hist(maxJaccs, [0.0, 0.05, 0.1, 0.15, 0.20, 1.0])
+    labelsClu, valuesClu = hist(portionsInClu, [0, 1, 2, 3, 4, 5, 100])
+    # rects = barPlot(plt=plt, labels=["<5%", "5-10%", "10-15%", "15-20%", ">20%"], valueLists=[jaccValues], width=0.5)
+    rects = barPlot(plt=plt, labels=["<1%", "1-2%", "2-3%", "3-4%", "4-5%", ">5%"], valueLists=[valuesClu], width=0.5)
     ax = plt.axes()
-    ax.legend( map(lambda r : r[0], rects), ['Best Jaccard Coeff.'], loc=1)
+    # ax.legend(map(lambda r : r[0], rects), ['Best Jaccard Coeff.'], loc=1)
+    ax.legend(map(lambda r : r[0], rects), ['Cluster Size'], loc=1)
     plt.tight_layout()
     plt.show()
 

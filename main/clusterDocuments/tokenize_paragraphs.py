@@ -1,21 +1,19 @@
-from util import connectToDb, getAllDocumentIds, build_csr_matrix, save_csr_matrix, load_csr_matrix, addToDict, numpyArr2Bin, bin2NumpyArr, flatten
-import json
-from string import digits, ascii_letters
+from util import bin2NumpyArr, flatten
 import re
-from sklearn.feature_extraction.text import TfidfTransformer
-import joblib
+
 
 def getParsFromDocument(documentId, cursor):
     cursor.execute("""
         SELECT paragraph_id, numpy_array FROM paragraph
         WHERE document = %(document)s
-    """, {"document" : documentId})
+    """, {"document": documentId})
 
-    pars = { }
+    pars = {}
     for row in cursor:
         pars[row[0]] = bin2NumpyArr(row[1])
 
     return pars
+
 
 def parsToFeatureCounts(pars, onlyTheorems):
     thmPars = None
@@ -24,11 +22,11 @@ def parsToFeatureCounts(pars, onlyTheorems):
     else:
         thmPars = map(lambda x: x[1], pars.items())
 
-    textTokenList = filter(lambda token : not(token[:5] == "<fid "), flatten(flatten(thmPars)))
+    textTokenList = filter(lambda token: not(token[:5] == "<fid "), flatten(flatten(thmPars)))
 
-    tokenCounts = { }
+    tokenCounts = {}
     for token in textTokenList:
-        if not token in tokenCounts:
+        if token not in tokenCounts:
             tokenCounts[token] = 0
         tokenCounts[token] = tokenCounts[token] + 1
 
@@ -53,7 +51,7 @@ if __name__ == "__main__":
         textTokenList = filter(lambda token : not(token[:5] == "<fid "), flatten(flatten(thmPars)))
 
         addToDict(globalTokenCounts, featureMap)
-    
+
     f = open("derived_data/theorem_text_token_counts.json", "w")
     f.write(json.dumps(globalTokenCounts))
     f.close()
@@ -77,7 +75,7 @@ if __name__ == "__main__":
     documentIds = getAllDocumentIds(cursor)
 
     token2IndexMap = json.load(open("derived_data/theorem_text_token2index_map.json"))
-    
+
     l = []
     count = 0
     for docId in documentIds[:10]:

@@ -7,6 +7,7 @@ import numpy as np
 import joblib
 from cluster_documents_util import sparseData2Matrix
 import json
+from sklearn.cluster import KMeans
 
 corpusFilepath = "/home/simon/Projekte/zbMathClustering/raw_vector-small.json"
 corpus = ArffJsonCorpus(corpusFilepath)

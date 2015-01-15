@@ -63,4 +63,3 @@ class ArffJsonCorpus:
 
             return csr_matrix( (data,(row,col)), shape=(shapeRows, shapeCols) ), index2ProjectIndex
             
-# c = ArffJsonCorpus("../../ClassificationFramework/data/common/title_only/tf_idf/test.json")

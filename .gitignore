@@ -6,3 +6,5 @@ notes/
 *.pyc
 *.swp
 db_connect.json
+.ropeproject/
+warning_log

@@ -9,6 +9,8 @@ from sklearn.preprocessing import Normalizer
 from scipy.sparse import csr_matrix
 import numpy as np
 from sklearn.decomposition import TruncatedSVD
+from sklearn.cluster import AffinityPropagation
+from sklearn.mixture import GMM
 
 def getFormulaIdsFromPars(pars, onlyTheorems):
     thmPars = None
