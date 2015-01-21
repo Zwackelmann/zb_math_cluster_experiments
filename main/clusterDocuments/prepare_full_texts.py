@@ -3,7 +3,7 @@ from os import path
 import json
 from scipy.sparse import csr_matrix
 from util import get_dirpath, get_filenames_and_filepaths, DocumentParser
-from util import connectToDb
+from util import connect_to_db
 from string import printable
 import re
 
@@ -282,6 +282,12 @@ VALUES
 (%(document_id)s, %(paragraph_id)s, %(numpy_array)s)
 """
 
+paragraph2InsertStmt = """
+INSERT INTO paragraph2(document, paragraph_id, text)
+VALUES
+(%(document_id)s, %(paragraph_id)s, %(text)s)
+"""
+
 theoremInsertStmt = """
 INSERT INTO theorem(document, paragraph_id, theorem_type, text)
 VALUES
@@ -300,7 +306,7 @@ VALUES
 (%(document_id)s, %(msc)s, %(pos)s)
 """
 
-db = connectToDb()
+db = connect_to_db()
 cursor = db.cursor()
 warning_log = open("warning_log", "a")
 
@@ -311,14 +317,14 @@ for filename, filepath in zip(filenames, filepaths):
     sys.stdout.write("processing " + filename + "... ")
 
     # doc, tokenizedParagraphs, formulaDict = p.parseWithParagraphStructure(filename)
-    doc, raw_paragraphs, formulaDict = p.parseRaw(filepath)
+    doc, raw_paragraphs, formula_dict = p.parse_raw(filepath)
 
     # info for doc table:
-    document_id = doc.arxivId()
-    publicationDate = doc.publicationDate
+    document_id = doc.arxiv_id()
+    publication_date = doc.publication_date
     title = doc.title
-    msc_cats = doc.zbMscCats
-    mainMscCat = None if len(doc.zbMscCats) == 0 else doc.zbMscCats[0][:2]
+    msc_cats = doc.zb_msc_cats
+    main_msc_cat = None if len(doc.zb_msc_cats) == 0 else doc.zb_msc_cats[0][:2]
     authors = doc.authors
 
     """documentContentMap = {
@@ -353,9 +359,18 @@ for filename, filepath in zip(filenames, filepaths):
         cursor.execute(paragraphInsertStmt, paragraphContentMap)
 
     """
+    # paragraph2s
+    for paragraph_id, text in raw_paragraphs:
+        paragraphContentMap = {
+            "document_id": filter(lambda c: c in printable, document_id),
+            "paragraph_id": filter(lambda c: c in printable, paragraph_id),
+            "text": unicode(text).encode('utf16')
+        }
+
+        cursor.execute(paragraph2InsertStmt, paragraphContentMap)
 
     # authorships
-    for author, rank in zip(authors, range(len(authors))):
+    """for author, rank in zip(authors, range(len(authors))):
         authorId = author.ident
         display_name = author.name
 
@@ -365,19 +380,19 @@ for filename, filepath in zip(filenames, filepaths):
             "display_name": display_name,
             "zbmath_id": authorId
         }
-        cursor.execute(authorshipInsertStmt, authorshipContentMap)
+        cursor.execute(authorshipInsertStmt, authorshipContentMap)"""
 
     # msc cats
-    for msc_cat, pos in zip(list(set(msc_cats)), range(len(msc_cats))):
+    """for msc_cat, pos in zip(list(set(msc_cats)), range(len(msc_cats))):
         mscAssignmentContentMap = {
             "document_id": document_id,
             "msc": msc_cat,
             "pos": pos+1
         }
-        cursor.execute(mscAssignmentInsertStmt, mscAssignmentContentMap)
+        cursor.execute(mscAssignmentInsertStmt, mscAssignmentContentMap)"""
 
     # theorems
-    for paragraph_id, text in raw_paragraphs:
+    """for paragraph_id, text in raw_paragraphs:
         x = parseParagraphId(paragraph_id.lower())
         if x is not None and x['type'] == 'theorem':
             theoremContentMap = {
@@ -387,10 +402,9 @@ for filename, filepath in zip(filenames, filepaths):
                 "text": unicode(text).encode('utf16')
             }
 
-            cursor.execute(theoremInsertStmt, theoremContentMap)
+            cursor.execute(theoremInsertStmt, theoremContentMap)"""
 
     db.commit()
-
     sys.stdout.write("SUCCESS\n")
 
 db.close()

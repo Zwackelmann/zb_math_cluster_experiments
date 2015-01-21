@@ -10,23 +10,9 @@ from operator import itemgetter
 import lda
 import lda.datasets
 import numpy as np
+import itertools
 
-testTheorem = """Let Assumption 1.4  be satisfied. Fix  <fid Thmtheorem1.p1.1.1.m1.1> , such that
-<fid Thmtheorem1.p1.1.1.m2.1> . Let  <fid Thmtheorem1.p1.1.1.m3.1> , where  <fid Thmtheorem1.p1.1.1.m4.1> .
-The nonlinear elliptic problem ( 1.3 ) with  <fid Thmtheorem1.p1.1.1.m5.1>  has a non-trivial solution
-<fid Thmtheorem1.p1.1.1.m6.1>  in the form ( 1.10 ) with  <fid Thmtheorem1.p1.1.1.m7.1>  for any
-<fid Thmtheorem1.p1.1.1.m8.1>  and sufficiently small  <fid Thmtheorem1.p1.1.1.m9.1>  if and only if
-there exists a non-trivial solution for  <fid Thmtheorem1.p1.1.1.m10.1>  of the bifurcation equations
-<fid S1.E12.m1.1> (1.12) where  <fid Thmtheorem1.p1.2.1.m1.1>  and  <fid Thmtheorem1.p1.2.1.m2.1>  are
-analytic functions of  <fid Thmtheorem1.p1.2.1.m3.1>  near  <fid Thmtheorem1.p1.2.1.m4.1>  satisfying
-the bounds <fid S1.E13.m1.1> (1.13) for sufficiently small  <fid Thmtheorem1.p1.3.1.m1.1> , fixe
-<fid Thmtheorem1.p1.3.1.m2.1> , and some constants  <fid Thmtheorem1.p1.3.1.m3.1>  which are
-independent of  <fid Thmtheorem1.p1.3.1.m4.1> and depend on  <fid Thmtheorem1.p1.3.1.m5.1> . Moreover
-<fid Thmtheorem1.p1.3.1.m6.1> ,  <fid Thmtheorem1.p1.3.1.m7.1>  and <fid S1.E14.m1.1> (1.14) for som
-<fid Thmtheorem1.p1.4.1.m1.1> -independent constant  <fid Thmtheorem1.p1.4.1.m2.1> ."""
-
-
-def get_theorem_feature_counts(document_id, cursor, method="kristianto"):
+def get_theorems_from_doc(document_id, cursor):
     cursor.execute("""
         SELECT paragraph_id, theorem_type, text FROM theorem
         WHERE document = %(document)s
@@ -36,46 +22,22 @@ def get_theorem_feature_counts(document_id, cursor, method="kristianto"):
     for row in cursor:
         theorems[row[0]] = {"type": row[1],
                             "text": row[2].decode('utf-16')}
+    return theorems
 
-    if method == "kristianto":
-        cursor.execute("""
-            SELECT formula_id, c_math_ml FROM formula
-            WHERE document = %(document)s
-        """, {"document": document_id})
+def get_formulas_from_doc(document_id, cursor):
+    cursor.execute("""
+        SELECT formula_id, p_math_ml, c_math_ml FROM formula
+        WHERE document = %(document)s
+    """, {"document": document_id})
 
-        formula_dict = {}
-        for row in cursor:
-            formula_dict[row[0]] = {"c_math_ml": row[1]}
+    formula_dict = {}
+    for row in cursor:
+        formula_dict[row[0]] = {"p_math_ml": row[1],
+                                "c_math_ml": row[2]}
 
-        theorem_feature_maps = []
-        for theorem_id, theorem in theorems.items():
-            theorem_tokens = tokenize_theorem(theorem['text'], formula_dict, method)
-            feature_map = group_and_count(theorem_tokens)
-            theorem_feature_maps.append((theorem_id, feature_map))
+    return formula_dict
 
-        return theorem_feature_maps
-    elif method == "lin":
-        cursor.execute("""
-            SELECT formula_id, c_math_ml FROM formula
-            WHERE document = %(document)s
-        """, {"document": document_id})
-
-        formula_dict = {}
-        for row in cursor:
-            formula_dict[row[0]] = {"c_math_ml": row[1]}
-
-        theorem_feature_maps = []
-        for theorem_id, theorem in theorems.items():
-            theorem_tokens = map(lambda x: x[0], tokenize_theorem(theorem['text'], formula_dict, method))
-            feature_map = group_and_count(theorem_tokens)
-            theorem_feature_maps.append((theorem_id, feature_map))
-
-        return theorem_feature_maps
-    else:
-        raise ValueError("Method must be either 'kristianto' or 'lin'")
-
-
-def tokenize_theorem(theorem_text, formula_dict, method="kristianto"):
+def tokenize_theorem(theorem_text, formula_dict, method):
     sep = MixedTextSeparator()
     ft = FormulaTokenizer()
     tt = TextTokenizer()
@@ -100,96 +62,89 @@ def tokenize_theorem(theorem_text, formula_dict, method="kristianto"):
 
     return tokens
 
+def get_theorem_tokens_from_doc(document_id, method, cursor):
+    doc_theorems = get_theorems_from_doc(document_id, cursor)
+    formula_dict = get_formulas_from_doc(document_id, cursor)
 
-"""def tokenizeFormula(formula):
-    f = FormulaTokenizer()
-    return f.parse(formula)"""
+    theorem_token_list = []
+    for theorem_id, theorem in doc_theorems.items():
+        theorem_tokens = tokenize_theorem(theorem['text'], formula_dict, method)
+        theorem_token_list.append(((document_id, theorem_id), theorem_tokens))
 
+    return theorem_token_list
 
-"""def theoremsToFeatureCounts(theorems):
-    textTokenList = filter(lambda token: not(token[:5] == "<fid "), flatten(flatten(theorems)))
+def get_all_theorems_as_token_list(method, cursor):
+    document_ids = get_all_document_ids(cursor)
+    return (theorem for document_id in document_ids for theorem in get_theorem_tokens_from_doc(document_id, method, cursor))
 
-    tokenCounts = {}
-    for token in textTokenList:
-        if token not in tokenCounts:
-            tokenCounts[token] = 0
-        tokenCounts[token] = tokenCounts[token] + 1
+def calc_word_counts(items):
+    global_token_counts = {}
+    item_count = 1
+    for id, tokens in items:
+        print id + " (" + str(item_count) + ")"
+        add_to_dict(global_token_counts, group_and_count(tokens))
+        item_count += 1
 
-    return tokenCounts"""
+    return global_token_counts
+
+def build_text_token_dict(global_feature_counts, min_count):
+    frequent_tokens = map(lambda i: i[0], filter(lambda c: c[1] >= min_count, global_feature_counts.items()))
+    token2index_map = dict(zip(sorted(frequent_tokens), range(len(frequent_tokens))))
+    return token2index_map
+
+def build_raw_csr_matrix(items, token2index_map):
+    item_maps = []
+    item_id_log = []
+
+    item_count = 1
+    for item_id, tokens in items:
+        print str(item_id) + " (" + str(item_count) + ")"
+
+        item_maps.append(group_and_count(tokens))
+        item_id_log.append(item_id)
+        item_count += 1
+
+    m = build_csr_matrix(list_of_maps=item_maps, token_2_index_map=token2index_map)
+    return m, item_id_log
 
 if __name__ == "__main__":
-    # === calc word counts
-    """db = connect_to_db()
+    db = connect_to_db()
     cursor = db.cursor()
-    document_ids = get_all_document_ids(cursor)
 
-    global_token_counts = {}
-    doc_count = 1
-    for document_id in document_ids:
-        print document_id + " (" + str(doc_count) + "/" + str(len(document_ids)) + ")"
-        theorem_feature_counts = get_theorem_feature_counts(document_id, cursor, "lin")
-
-        for c in theorem_feature_counts:
-            add_to_dict(global_token_counts, c[1])
-
-        doc_count += 1
+    # === calc word counts
+    """theorem_generator = get_all_theorems_as_token_list("lin", cursor)
+    token_counts = calc_word_counts(theorem_generator)
 
     f = open("derived_data/theorem_lintoken_counts.json", "w")
-    f.write(json.dumps(global_token_counts))
-    f.close()
-
-    db.close()"""
+    f.write(json.dumps(token_counts))
+    f.close()"""
 
     # === build text token dict
-    tokenCounts = json.load(open("derived_data/theorem_lintoken_counts.json"))
-    frequentTokens = map(lambda i: i[0], filter(lambda c: c[1] >= 5, tokenCounts.items()))
-    token2IndexMap = dict(zip(sorted(frequentTokens), range(len(frequentTokens))))
+    """token_counts = json.load(open("derived_data/theorem_lintoken_counts.json"))
+    text_token_dict = build_text_token_dict(token_counts, 5)
 
     f = open("derived_data/theorem_lintoken2index_map.json", "w")
     f.write(json.dumps(token2IndexMap))
-    f.close()
+    f.close()"""
 
     # === create raw csr_matrix for theorems
-    db = connect_to_db()
-    cursor = db.cursor()
-    document_ids = get_all_document_ids(cursor)
+    token2index_map = json.load(open("derived_data/theorem_lintoken2index_map.json"))
+    theorem_generator = itertools.islice(get_all_theorems_as_token_list("lin", cursor), 0, 100)
 
-    token_2_index_map = json.load(open("derived_data/theorem_lintoken2index_map.json"))
+    matrix, id_log = build_raw_csr_matrix(theorem_generator, token2index_map)
+    save_csr_matrix(matrix, "theorem_lin_raw_tdm")
 
-    # document_maps = []
-    theorem_maps = []
-    theorem_id_log = []
-
-    # doc_count = 1
-    theorem_count = 1
-    for document_id in document_ids:
-        print document_id + " (" + str(theorem_count) + "/" + str(len(document_ids)) + ")"
-        # theorem_dict = {}
-        theorem_feature_counts = get_theorem_feature_counts(document_id, cursor, "lin")
-        for c in theorem_feature_counts:
-            # add_to_dict(theorem_dict, c[1])
-            theorem_maps.append(c[1])
-            theorem_id_log.append((document_id, c[0]))
-
-        # if len(theorem_dict) != 0:
-        #    document_maps.append(theorem_dict)
-        #    document_id_log.append(document_id)
-
-        theorem_count += 1
-
-    m = build_csr_matrix(list_of_maps=theorem_maps, token_2_index_map=token_2_index_map)
-    save_csr_matrix(m, "derived_data/theorem_lin_raw_tdm")
-    f = open("derived_data/theorem_lin_raw_tdm_ids", "w")
-    for theorem_id in theorem_id_log:
+    f = open("theorem_lin_raw_tdm_ids", "w")
+    for theorem_id in id_log:
         f.write(theorem_id[0] + ";" + theorem_id[1] + "\n")
     f.close()
 
     # === train and dump tf-idf model for theorem texts
-    raw_theorem_tdm = load_csr_matrix("derived_data/theorem_lin_raw_tdm.npz")
+    """raw_theorem_tdm = load_csr_matrix("derived_data/theorem_lin_raw_tdm.npz")
     tfidf_trans = TfidfTransformer()
     tfidf_trans.fit(raw_theorem_tdm)
 
-    joblib.dump(tfidf_trans, "models/lin_raw_theorem_tfidf_model")
+    joblib.dump(tfidf_trans, "models/lin_raw_theorem_tfidf_model")"""
 
     # === append author information to theorem ids
     """f = open("derived_data/theorem_raw_tdm_ids")
@@ -217,10 +172,10 @@ if __name__ == "__main__":
     f2.close()"""
 
     # === train lda
-    raw_theorem_tdm = load_csr_matrix("derived_data/theorem_lin_raw_tdm.npz")
+    """raw_theorem_tdm = load_csr_matrix("derived_data/theorem_lin_raw_tdm.npz")
     model = lda.LDA(n_topics=100, n_iter=500, random_state=1)
     model.fit(tfidf_trans.transform(raw_theorem_tdm))
-    joblib.dump(model, "lin_topic_model")
+    joblib.dump(model, "lin_topic_model")"""
 
     # print topic words
     """model = joblib.load("topic_model")

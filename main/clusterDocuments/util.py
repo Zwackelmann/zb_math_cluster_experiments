@@ -146,7 +146,7 @@ def flatten(l):
     return [item for sublist in l for item in sublist]
 
 
-def takeN(iter, n):
+def take_n(iter, n):
     for i in xrange(n):
         yield iter.next()
 
@@ -380,11 +380,11 @@ def get_chi_files(folder):
 
 
 def get_best_chi_terms(label_matrix, TDM, index_2_word_map, chi_threshold, class_number_2_label=None):
-    bestTerms = get_chi_scores(TDM, label_matrix, 10000)
+    best_terms = get_chi_scores(TDM, label_matrix, 10000)
 
     d = {}
     index = 0
-    for best_terms_for_cluster in bestTerms:
+    for best_terms_for_cluster in best_terms:
         best_terms_for_cluster = filter(lambda x: x[1] > chi_threshold, best_terms_for_cluster)
 
         if class_number_2_label is None:
@@ -489,144 +489,143 @@ class Document:
 
 class DocumentParser:
     def __init__(self):
-        self.textTokenizer = DocumentParser.TextTokenizer()
-        self.formulaTokenizer = DocumentParser.FormulaTokenizer()
-        self.sentenceDetector = nltk.data.load('tokenizers/punkt/english.pickle')
+        self.text_tokenizer = DocumentParser.TextTokenizer()
+        self.formula_tokenizer = DocumentParser.FormulaTokenizer()
+        self.sentence_detector = nltk.data.load('tokenizers/punkt/english.pickle')
 
     def parse(self, filepath):
         source = open(filepath)
-        rawDocument = DocumentParser.RawDocument()
-        ch = DocumentParser.ZbMathContentHandler(rawDocument)
+        raw_document = DocumentParser.RawDocument()
+        ch = DocumentParser.ZbMathContentHandler(raw_document)
         xml.sax.parse(source, ch)
 
         tokens = []
-        for content in rawDocument.rawContent:
+        for content in raw_document.raw_content:
             if type(content) is DocumentParser.RawDocument.TextContent:
-                tokens.extend(self.textTokenizer.tokenize(content.content))
+                tokens.extend(self.text_tokenizer.tokenize(content.content))
             elif type(content) is DocumentParser.RawDocument.FormulaContent:
-                tokens.extend(self.formulaTokenizer.tokenize(content.latex))
+                tokens.extend(self.formula_tokenizer.tokenize(content.latex))
             elif type(content) is DocumentParser.RawDocument.Paragraph:
                 pass
             else:
                 raise ValueError(str(type(content)) + " is not supported")
 
-        rawDocument.rawContent = tokens
-        return rawDocument.toDocument()
+        raw_document.raw_content = tokens
+        return raw_document.to_document()
 
-    def parseWithParagraphStructure(self, filepath):
+    def parse_with_paragraph_structure(self, filepath):
         source = open(filepath)
-        rawDocument = DocumentParser.RawDocument()
+        raw_document = DocumentParser.RawDocument()
 
-        ch = DocumentParser.ZbMathContentHandler(rawDocument)
+        ch = DocumentParser.ZbMathContentHandler(raw_document)
         xml.sax.parse(source, ch)
 
         paragraphs = []
-        paragraphBuffer = []
-        formulaDict = {}
-        currentParagraphId = None
+        paragraph_buffer = []
+        formula_dict = {}
+        current_paragraph_id = None
 
-        for content in rawDocument.rawContent:
+        for content in raw_document.raw_content:
             if type(content) is DocumentParser.RawDocument.TextContent:
-                paragraphBuffer.append(content.content)
+                paragraph_buffer.append(content.content)
             elif type(content) is DocumentParser.RawDocument.FormulaContent:
-                paragraphBuffer.append("<fid " + content.ident + ">")
-                formulaDict[content.ident] = content
+                paragraph_buffer.append("<fid " + content.ident + ">")
+                formula_dict[content.ident] = content
             elif type(content) is DocumentParser.RawDocument.Paragraph:
-                if currentParagraphId is not None:
-                    paragraphString = " ".join(paragraphBuffer)
-                    paragraphBuffer = []
-                    sentences = self.sentenceDetector.tokenize(paragraphString)
+                if current_paragraph_id is not None:
+                    paragraph_string = " ".join(paragraph_buffer)
+                    paragraph_buffer = []
+                    sentences = self.sentence_detector.tokenize(paragraph_string)
 
-                    paragraphs.append((currentParagraphId, map(lambda s: self.tokenizeSentence(s, None), sentences)))
+                    paragraphs.append((current_paragraph_id, map(lambda s: self.tokenize_sentence(s, None), sentences)))
 
-                currentParagraphId = content.ident
+                current_paragraph_id = content.ident
             else:
                 raise ValueError(str(type(content)) + " is not supported")
 
-        if len(paragraphBuffer) != 0 and currentParagraphId is not None:
-            paragraphString = " ".join(paragraphBuffer)
-            sentences = self.sentenceDetector.tokenize(paragraphString)
-            paragraphs.append((currentParagraphId, map(lambda s: self.tokenizeSentence(s, None), sentences)))
+        if len(paragraph_buffer) != 0 and current_paragraph_id is not None:
+            paragraph_string = " ".join(paragraph_buffer)
+            sentences = self.sentence_detector.tokenize(paragraph_string)
+            paragraphs.append((current_paragraph_id, map(lambda s: self.tokenize_sentence(s, None), sentences)))
 
-        return rawDocument.toDocument(), paragraphs, formulaDict
+        return raw_document.to_document(), paragraphs, formula_dict
 
-    def parseRaw(self, filepath):
+    def parse_raw(self, filepath):
         source = open(filepath)
-        rawDocument = DocumentParser.RawDocument()
-
-        ch = DocumentParser.ZbMathContentHandler(rawDocument)
+        raw_document = DocumentParser.RawDocument()
+        ch = DocumentParser.ZbMathContentHandler(raw_document)
         xml.sax.parse(source, ch)
 
         paragraphs = []
-        paragraphBuffer = []
-        formulaDict = {}
-        currentParagraphId = None
+        paragraph_buffer = []
+        formula_dict = {}
+        current_paragraph_id = None
 
-        for content in rawDocument.rawContent:
+        for content in raw_document.raw_content:
             if type(content) is DocumentParser.RawDocument.TextContent:
-                paragraphBuffer.append(content.content)
+                paragraph_buffer.append(content.content)
             elif type(content) is DocumentParser.RawDocument.FormulaContent:
-                paragraphBuffer.append("<fid " + content.ident + ">")
-                formulaDict[content.ident] = content
+                paragraph_buffer.append("<fid " + content.ident + ">")
+                formula_dict[content.ident] = content
             elif type(content) is DocumentParser.RawDocument.Paragraph:
-                if currentParagraphId is not None:
-                    paragraphString = " ".join(paragraphBuffer)
-                    paragraphBuffer = []
+                if current_paragraph_id is not None:
+                    paragraph_string = " ".join(paragraph_buffer)
+                    paragraph_buffer = []
 
-                    paragraphs.append((currentParagraphId, paragraphString))
+                    paragraphs.append((current_paragraph_id, paragraph_string))
 
-                currentParagraphId = content.ident
+                current_paragraph_id = content.ident
             else:
                 raise ValueError(str(type(content)) + " is not supported")
 
-        if len(paragraphBuffer) != 0 and currentParagraphId is not None:
-            paragraphString = " ".join(paragraphBuffer)
-            paragraphs.append((currentParagraphId, paragraphString))
+        if len(paragraph_buffer) != 0 and current_paragraph_id is not None:
+            paragraph_string = " ".join(paragraph_buffer)
+            paragraphs.append((current_paragraph_id, paragraph_string))
 
-        return rawDocument.toDocument(), paragraphs, formulaDict
+        return raw_document.to_document(), paragraphs, formula_dict
 
-    def tokenizeSentence(self, sentence, formulaDict=None):
+    def tokenize_sentence(self, sentence, formula_dict=None):
         tokens = []
 
         while len(sentence) != 0:
             res = re.search(r"<fid [^>]+>", sentence)
             if res is None:
-                tokens.extend(self.textTokenizer.tokenize(sentence))
+                tokens.extend(self.text_tokenizer.tokenize(sentence))
                 break
             else:
-                tokens.extend(self.textTokenizer.tokenize(sentence[:res.start()]))
+                tokens.extend(self.text_tokenizer.tokenize(sentence[:res.start()]))
 
-                formulaId = sentence[res.start()+5:res.end()-1]
-                if formulaDict is not None:
-                    formula = formulaDict.get(formulaId)
+                formula_id = sentence[res.start()+5:res.end()-1]
+                if formula_dict is not None:
+                    formula = formula_dict.get(formula_id)
                     if formula is not None:
                         tokens.append("$" + formula.latex + "$")
                 else:
-                    tokens.append("<fid " + formulaId + ">")
+                    tokens.append("<fid " + formula_id + ">")
 
                 sentence = sentence[res.end():]
         return tokens
 
     class RawDocument:
         def __init__(self):
-            self.includedSources = []
+            self.included_sources = []
             self.identifiers = []
             self.title = None
             self.abstract = None
             self.languages = []
-            self.rawPublicationDate = None
-            self.zbMscCats = []
-            self.arxivCats = []
-            self.plainAuthors = []
-            self.authorIdentifiers = []
-            self.rawContent = []
+            self.raw_publication_date = None
+            self.zb_msc_cats = []
+            self.arxiv_cats = []
+            self.plain_authors = []
+            self.author_identifiers = []
+            self.raw_content = []
 
         class FormulaContent(object):
-            def __init__(self, ident, latex, pMathML, cMathML):
+            def __init__(self, ident, latex, p_math_ml, c_math_ml):
                 self.ident = ident
                 self.latex = latex
-                self.pMathML = pMathML
-                self.cMathML = cMathML
+                self.p_math_ml = p_math_ml
+                self.c_math_ml = c_math_ml
 
         class TextContent(object):
             def __init__(self, content):
@@ -636,50 +635,50 @@ class DocumentParser:
             def __init__(self, ident):
                 self.ident = ident
 
-        def toDocument(self):
+        def to_document(self):
             authors = []
-            if len(self.authorIdentifiers) == len(self.plainAuthors):
-                for name, ident in zip(self.plainAuthors, self.authorIdentifiers):
+            if len(self.author_identifiers) == len(self.plain_authors):
+                for name, ident in zip(self.plain_authors, self.author_identifiers):
                     authors.append(Document.Author(name=name, ident=ident))
             else:
-                for name in self.plainAuthors:
+                for name in self.plain_authors:
                     authors.append(Document.Author(name=name, ident=None))
 
             identifiers = []
             for ident in self.identifiers:
                 identifiers.append(Document.Identifier(ident=ident['id'], source=ident['type']))
 
-            parsedTime = None
-            if self.rawPublicationDate is not None:
-                parsedTime = time.strptime(self.rawPublicationDate[:10], "%Y-%m-%d")
+            parsed_time = None
+            if self.raw_publication_date is not None:
+                parsed_time = time.strptime(self.raw_publication_date[:10], "%Y-%m-%d")
 
             return Document(
-                includedSources=self.includedSources,
+                included_sources=self.included_sources,
                 identifiers=identifiers,
                 title=self.title,
                 abstract=self.abstract,
                 languages=self.languages,
-                publicationDate=parsedTime,
-                zbMscCats=self.zbMscCats,
-                arxivCats=self.arxivCats,
+                publication_date=parsed_time,
+                zb_msc_cats=self.zb_msc_cats,
+                arxiv_cats=self.arxiv_cats,
                 authors=authors,
-                fullTextTokens=self.rawContent
+                full_text_tokens=self.raw_content
             )
 
-    RawDocument.dateFormat = ""
+    RawDocument.date_format = ""
 
     class ZbMathContentHandler(xml.sax.ContentHandler):
-        def __init__(self, rawDocument):
+        def __init__(self, raw_document):
             xml.sax.ContentHandler.__init__(self)
             self.path = []
-            self.document = rawDocument
+            self.document = raw_document
 
             # mathml capturing
-            self.formulaId = None
-            self.latexBuffer = None
-            self.cMathMLBuffer = []
-            self.pMathMLBuffer = []
-            self.capturingMathState = None
+            self.formula_id = None
+            self.latex_buffer = None
+            self.c_mathml_buffer = []
+            self.p_mathml_buffer = []
+            self.capturing_math_state = None
 
         def startElement(self, name, attrs):
             self.path.append(name)
@@ -690,54 +689,54 @@ class DocumentParser:
                 if len(self.path) >= 2 and self.path[-2] == "identifiers" and self.path[-1] == "id":
                     self.document.identifiers.append({'type': attrs['type']})
             elif self.path[1] == "content":
-                if self.capturingMathState is None:
+                if self.capturing_math_state is None:
                     if name == "math":
-                        self.formulaId = ascii_escape(attrs['id']) if 'id' in attrs.keys() else None
-                        self.latexBuffer = ascii_escape(attrs['alttext']) if 'alttext' in attrs.keys() else None
-                        self.capturingMathState = "found math tag"
+                        self.formula_id = ascii_escape(attrs['id']) if 'id' in attrs.keys() else None
+                        self.latex_buffer = ascii_escape(attrs['alttext']) if 'alttext' in attrs.keys() else None
+                        self.capturing_math_state = "found math tag"
                     elif len(self.path) == 3 and name == "div":
-                        self.document.rawContent.append(DocumentParser.RawDocument.Paragraph(ascii_escape(attrs['id'])))
+                        self.document.raw_content.append(DocumentParser.RawDocument.Paragraph(ascii_escape(attrs['id'])))
                 else:
-                    if self.capturingMathState == "found math tag" and name == "semantics":
-                        self.capturingMathState = "capture pmathml"
-                    elif self.capturingMathState == "capture pmathml" and name != "annotation-xml":
-                        self.pMathMLBuffer.append("<" + name + ">")
-                    elif self.capturingMathState == "capture pmathml" and name == "annotation-xml":
-                        self.capturingMathState = "capture cmathml"
-                    elif self.capturingMathState == "capture cmathml":
-                        self.cMathMLBuffer.append("<" + name + ">")
-                    elif self.capturingMathState == "fading out":
+                    if self.capturing_math_state == "found math tag" and name == "semantics":
+                        self.capturing_math_state = "capture pmathml"
+                    elif self.capturing_math_state == "capture pmathml" and name != "annotation-xml":
+                        self.p_mathml_buffer.append("<" + name + ">")
+                    elif self.capturing_math_state == "capture pmathml" and name == "annotation-xml":
+                        self.capturing_math_state = "capture cmathml"
+                    elif self.capturing_math_state == "capture cmathml":
+                        self.c_mathml_buffer.append("<" + name + ">")
+                    elif self.capturing_math_state == "fading out":
                         pass
                     else:
-                        raise ValueError("WARNING: invalid state while captureing math: " + self.capturingMathState)
+                        raise ValueError("WARNING: invalid state while captureing math: " + self.capturing_math_state)
 
         def endElement(self, name):
             del self.path[-1]
 
-            if self.capturingMathState == "capture pmathml":
-                self.pMathMLBuffer.append("</" + name + ">")
-            elif self.capturingMathState == "capture cmathml" and name != "annotation-xml":
-                self.cMathMLBuffer.append("</" + name + ">")
-            elif self.capturingMathState == "capture cmathml" and name == "annotation-xml":
-                self.capturingMathState = "fading out"
+            if self.capturing_math_state == "capture pmathml":
+                self.p_mathml_buffer.append("</" + name + ">")
+            elif self.capturing_math_state == "capture cmathml" and name != "annotation-xml":
+                self.c_mathml_buffer.append("</" + name + ">")
+            elif self.capturing_math_state == "capture cmathml" and name == "annotation-xml":
+                self.capturing_math_state = "fading out"
             else:
                 pass
 
             if name == "math":
-                if self.formulaId is not None:
+                if self.formula_id is not None:
                     formula = DocumentParser.RawDocument.FormulaContent(
-                        ident=self.formulaId,
-                        latex=self.latexBuffer,
-                        pMathML="<math>" + "".join(self.pMathMLBuffer) + "</math>",
-                        cMathML="<math>" + "".join(self.cMathMLBuffer) + "</math>"
+                        ident=self.formula_id,
+                        latex=self.latex_buffer,
+                        p_math_ml="<math>" + "".join(self.p_mathml_buffer) + "</math>",
+                        c_math_ml="<math>" + "".join(self.c_mathml_buffer) + "</math>"
                     )
-                    self.document.rawContent.append(formula)
+                    self.document.raw_content.append(formula)
 
-                self.capturingMathState = None
-                self.formulaId = None
-                self.latexBuffer = None
-                self.pMathMLBuffer = []
-                self.cMathMLBuffer = []
+                self.capturing_math_state = None
+                self.formula_id = None
+                self.latex_buffer = None
+                self.p_mathml_buffer = []
+                self.c_mathml_buffer = []
 
         def characters(self, content):
             if len(self.path) <= 1:
@@ -745,7 +744,7 @@ class DocumentParser:
 
             if self.path[1] == 'included_sources':
                 if self.path[-1] == 'source':
-                    self.document.includedSources.append(content)
+                    self.document.included_sources.append(content)
             elif self.path[1] == 'metadata':
                 if len(self.path) >= 2 and self.path[-2] == "identifiers" and self.path[-1] == "id":
                     self.document.identifiers[-1]['id'] = content.strip()
@@ -760,27 +759,27 @@ class DocumentParser:
                     else:
                         self.document.abstract += " " + content.strip()
                 elif self.path[-1] == 'arxiv_publication_date':
-                    self.document.rawPublicationDate = content.strip()
+                    self.document.raw_publication_date = content.strip()
                 elif len(self.path) >= 2 and self.path[-2] == "languages" and self.path[-1] == "language":
                     self.document.languages.append(content.strip())
                 elif len(self.path) >= 3 and self.path[-3] == "authors" and self.path[-2] == "author" and self.path[-1] == "name":
-                    self.document.plainAuthors.append(content.strip())
+                    self.document.plain_authors.append(content.strip())
                 elif len(self.path) >= 2 and self.path[-2] == "zb_author_identifiers" and self.path[-1] == "author_identifier":
-                    self.document.authorIdentifiers.append(content.strip())
+                    self.document.author_identifiers.append(content.strip())
                 elif len(self.path) >= 3 and self.path[-3] == "semantic_metadata" and self.path[-2] == "arxiv" and self.path[-1] == "cat":
-                    self.document.arxivCats.append(content.strip())
+                    self.document.arxiv_cats.append(content.strip())
                 elif len(self.path) >= 3 and self.path[-3] == "semantic_metadata" and self.path[-2] == "zb_msc" and self.path[-1] == "cat":
-                    self.document.zbMscCats.append(content.strip())
+                    self.document.zb_msc_cats.append(content.strip())
 
             elif self.path[1] == 'content':
-                if self.capturingMathState is None:
+                if self.capturing_math_state is None:
                     if not content.strip() == '':
-                        self.document.rawContent.append(DocumentParser.RawDocument.TextContent(content))
+                        self.document.raw_content.append(DocumentParser.RawDocument.TextContent(content))
                 else:
-                    if self.capturingMathState == "capture pmathml":
-                        self.pMathMLBuffer.append(ascii_escape(saxutils.escape(content.strip())))
-                    elif self.capturingMathState == "capture cmathml":
-                        self.cMathMLBuffer.append(ascii_escape(saxutils.escape(content.strip())))
+                    if self.capturing_math_state == "capture pmathml":
+                        self.p_mathml_buffer.append(ascii_escape(saxutils.escape(content.strip())))
+                    elif self.capturing_math_state == "capture cmathml":
+                        self.c_mathml_buffer.append(ascii_escape(saxutils.escape(content.strip())))
                     else:
                         pass
 
@@ -799,18 +798,18 @@ class DocumentParser:
         def __init__(self):
             pass
 
-        def tokenize(self, matStr):
-            if matStr is None or len(matStr) == 0:
+        def tokenize(self, mat_str):
+            if mat_str is None or len(mat_str) == 0:
                 return []
             else:
                 tokens = []
-                tokenBuffer = None
-                strlen = len(matStr)
+                token_buffer = None
+                strlen = len(mat_str)
                 state = 0
                 index = 0
 
                 while strlen > index:
-                    char = matStr[index]
+                    char = mat_str[index]
                     if state == 0:
                         if char == '\\':
                             state = 1
@@ -821,25 +820,25 @@ class DocumentParser:
 
                     elif state == 1:
                         if char in ascii_letters:
-                            tokenBuffer = char
+                            token_buffer = char
                             state = 2
                         else:
                             tokens.append("$" + char + "$")
                             state = 0
                     elif state == 2:
                         if char in ascii_letters:
-                            tokenBuffer += char
+                            token_buffer += char
                         else:
-                            tokens.append("$" + tokenBuffer + "$")
-                            tokenBuffer = None
+                            tokens.append("$" + token_buffer + "$")
+                            token_buffer = None
                             index -= 1
                             state = 0
                     else:
                         raise ValueError("Undefined state while tokenizing")
                     index += 1
 
-                if tokenBuffer is not None:
-                    tokens.append("$" + tokenBuffer + "$")
+                if token_buffer is not None:
+                    tokens.append("$" + token_buffer + "$")
 
                 return tokens
 
@@ -875,7 +874,7 @@ class FormulaTokenizer:
                 tokens = []
                 FormulaTokenizer.lin_tokenize(root, 1, tokens)
 
-                return tokens
+                return map(lambda x: x[0], tokens)
 
             except xml.sax._exceptions.SAXParseException:
                 print "Formula parse error! (" + str(formula_parse_error_count) + ")"
