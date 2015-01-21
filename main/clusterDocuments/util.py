@@ -854,17 +854,50 @@ formula_parse_error_count = 0
 class FormulaTokenizer:
     nodeCounter = 0
 
-    def tokenize(self, formula):
-        global formula_parse_error_count
-        ch = FormulaTokenizer.FormulaContentHandler()
+    def tokenize(self, formula, method="kristianto"):
+        if method == "kristianto":
+            global formula_parse_error_count
+            ch = FormulaTokenizer.FormulaContentHandler()
 
-        try:
-            xml.sax.parseString(formula, ch)
-            return FormulaTokenizer.leafsToTokens(ch.leafs)
-        except xml.sax._exceptions.SAXParseException:
-            formula_parse_error_count += 1
-            print "Formula parse error! (" + str(formula_parse_error_count) + ")"
-            return []
+            try:
+                xml.sax.parseString(formula, ch)
+                return FormulaTokenizer.leafsToTokens(ch.leafs)
+            except xml.sax._exceptions.SAXParseException:
+                formula_parse_error_count += 1
+                print "Formula parse error! (" + str(formula_parse_error_count) + ")"
+                return []
+        elif method == "lin":
+            ch = FormulaTokenizer.Formula2TreeContentHandler()
+
+            try:
+                xml.sax.parseString(formula, ch)
+                root = ch.path[0].children[0]
+                tokens = []
+                FormulaTokenizer.lin_tokenize(root, 1, tokens)
+
+                return tokens
+
+            except xml.sax._exceptions.SAXParseException:
+                print "Formula parse error! (" + str(formula_parse_error_count) + ")"
+                return []
+        else:
+            raise ValueError("method must be either 'kristianto' or 'lin'")
+
+    @classmethod
+    def lin_tokenize(cls, node, lvl, tokens):
+        if len(node.children) != 0:
+            serialized = node.serialize()
+            if serialized is not None:
+                tokens.append((serialized, lvl))
+
+            gen_sub_tokens = []
+            for child in node.children:
+                gen_sub_tokens.append(child.flat_serialize())
+                FormulaTokenizer.lin_tokenize(child, lvl+1, tokens)
+
+            tokens.append((node.name + "(" + ">".join(filter(lambda x: x is not None, gen_sub_tokens)) + ")", lvl))
+        elif node.text is not None:
+            tokens.append((node.name + "(" + node.text + ")", lvl))
 
     @classmethod
     def leafsToTokens(cls, leafs):
@@ -958,6 +991,64 @@ class FormulaTokenizer:
             currentLeafNode = self.path[-1]
             currentLeafNode.chars += content.strip()
             self.tokenCandidateBuffer[-1] = copy.deepcopy(self.path)
+
+    class FormulaTreeNode(object):
+        def __init__(self, name):
+            self.name = name
+            self.children = []
+            self.text = None
+            self.parent = None
+
+        def append_text(self, text):
+            if self.text is None:
+                self.text = text
+            else:
+                self.text += text
+
+        def serialize(self):
+            if self.parent.name == "apply" and self.parent.children[0] == self:
+                return None
+
+            s = []
+            if self.name == "apply" and len(self.children) != 0:
+                s.append(self.children[0].name)
+            elif self.name != "apply" and self.text is not None:
+                s.append(self.text)
+
+            relevant_children = filter(lambda x: x is not None, map(lambda child: child.serialize(), self.children))
+            if len(relevant_children) != 0:
+                s.append(">".join(relevant_children))
+
+            return self.name + "(" + "#".join(s) + ")"
+
+        def flat_serialize(self):
+            if self.parent.name == "apply" and self.parent.children[0] == self:
+                return self.name
+
+            if self.name == "apply" and len(self.children) != 0:
+                return self.name + "(" + self.children[0].name + ")"
+            else:
+                return self.name + "()"
+
+    class Formula2TreeContentHandler(xml.sax.ContentHandler):
+        def __init__(self):
+            xml.sax.ContentHandler.__init__(self)
+            self.path = [FormulaTokenizer.FormulaTreeNode("root")]
+
+        def startElement(self, name, attrs):
+            new_node = FormulaTokenizer.FormulaTreeNode(name)
+            self.path[-1].children.append(new_node)
+            new_node.parent = self.path[-1]
+            self.path.append(new_node)
+
+        def endElement(self, name):
+            del self.path[-1]
+
+        def characters(self, content):
+            if len(content.strip()) == 0 or len(self.path) == 0:
+                return
+
+            self.path[-1].append_text(content.strip())
 
 
 class TextTokenizer:

@@ -5,6 +5,7 @@ results/
 notes/
 *.pyc
 *.swp
+*.swo
 db_connect.json
 .ropeproject/
 warning_log
