@@ -121,34 +121,35 @@ def build_raw_csr_matrix(items, token2index_map):
 if __name__ == "__main__":
     db = connect_to_db()
     cursor = db.cursor()
+    token_method = "kristianto"
 
     # === calc word counts
-    """theorem_generator = get_all_theorems_as_token_list("lin", cursor)
+    theorem_generator = get_all_theorems_as_token_list(token_method, cursor)
     token_counts = calc_word_counts(theorem_generator)
 
-    f = open("derived_data/theorem_lintoken_counts.json", "w")
+    f = open("derived_data/theorem_" + token_method + "token_counts.json", "w")
     f.write(json.dumps(token_counts))
-    f.close()"""
+    f.close()
 
     # === build text token dict
-    token_counts = json.load(open("derived_data/theorem_kristiantotoken_counts.json"))
+    token_counts = json.load(open("derived_data/theorem_" + token_method + "token_counts.json"))
     text_token_dict = build_text_token_dict(token_counts, 3)
 
-    f = open("derived_data/theorem_kristiantotoken2index_map.json", "w")
+    f = open("derived_data/theorem_" + token_method + "token2index_map.json", "w")
     f.write(json.dumps(text_token_dict))
     f.close()
 
     # === create raw csr_matrix for theorems
-    """token2index_map = json.load(open("derived_data/theorem_kristiantotoken2index_map.json"))
-    theorem_generator = itertools.islice(get_all_theorems_as_token_list("kristianto", cursor), 0, 100)
+    token2index_map = json.load(open("derived_data/theorem_" + token_method + "token2index_map.json"))
+    theorem_generator = get_all_theorems_as_token_list(token_method, cursor)
 
     matrix, id_log = build_raw_csr_matrix(theorem_generator, token2index_map)
-    save_csr_matrix(matrix, "derived_data/theorem_lin_raw_tdm")
+    save_csr_matrix(matrix, "derived_data/theorem_" + token_method + "_raw_tdm")
 
-    f = open("derived_data/theorem_lin_raw_tdm_ids", "w")
+    f = open("derived_data/theorem_" + token_method + "_raw_tdm_ids", "w")
     for theorem_id in id_log:
         f.write(theorem_id[0] + ";" + theorem_id[1] + "\n")
-    f.close()"""
+    f.close()
 
     # === train and dump tf-idf model for theorem texts
     """raw_theorem_tdm = load_csr_matrix("derived_data/theorem_lin_raw_tdm.npz")
