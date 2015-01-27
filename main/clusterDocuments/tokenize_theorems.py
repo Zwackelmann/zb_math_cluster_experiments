@@ -165,15 +165,15 @@ if __name__ == "__main__":
     cursor = db.cursor()
 
     interesting_settings = [
-        {"data_basis": "only_theorems", "token_method": "lin", "granularity": "paragraphs"},
-        {"data_basis": "only_theorems", "token_method": "lin", "granularity": "documents"},
+        # {"data_basis": "only_theorems", "token_method": "lin", "granularity": "paragraphs"},
+        # {"data_basis": "only_theorems", "token_method": "lin", "granularity": "documents"},
         {"data_basis": "only_theorems", "token_method": "kristianto", "granularity": "paragraphs"},
         {"data_basis": "only_theorems", "token_method": "kristianto", "granularity": "documents"},
-        {"data_basis": "only_theorems", "token_method": "plaintext", "granularity": "paragraphs"},
-        {"data_basis": "only_theorems", "token_method": "plaintext", "granularity": "documents"},
-        {"data_basis": "full_text", "token_method": "lin", "granularity": "documents"},
+        # {"data_basis": "only_theorems", "token_method": "plaintext", "granularity": "paragraphs"},
+        # {"data_basis": "only_theorems", "token_method": "plaintext", "granularity": "documents"},
+        # {"data_basis": "full_text", "token_method": "lin", "granularity": "documents"},
         {"data_basis": "full_text", "token_method": "kristianto", "granularity": "documents"},
-        {"data_basis": "full_text", "token_method": "plaintext", "granularity": "documents"}
+        # {"data_basis": "full_text", "token_method": "plaintext", "granularity": "documents"}
     ]
 
     for setting in interesting_settings:
@@ -182,7 +182,7 @@ if __name__ == "__main__":
         token_method = setting["token_method"]
         granularity = setting["granularity"]
 
-        debug_max_items = 100
+        debug_max_items = None
 
         # === calc word counts
         if granularity == "paragraphs":
