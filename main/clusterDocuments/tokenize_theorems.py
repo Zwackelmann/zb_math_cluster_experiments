@@ -11,6 +11,10 @@ import lda
 import lda.datasets
 import numpy as np
 import itertools
+import math
+from fractions import Fraction
+from gensim.models.ldamodel import LdaModel
+
 
 def get_theorems_from_doc(document_id, cursor):
     cursor.execute("""
@@ -24,6 +28,7 @@ def get_theorems_from_doc(document_id, cursor):
                             "text": row[2].decode('utf-16')}
     return theorems
 
+
 def get_formulas_from_doc(document_id, cursor):
     cursor.execute("""
         SELECT formula_id, p_math_ml, c_math_ml FROM formula
@@ -36,6 +41,7 @@ def get_formulas_from_doc(document_id, cursor):
                                 "c_math_ml": row[2]}
 
     return formula_dict
+
 
 def tokenize_theorem(theorem_text, formula_dict, method):
     sep = MixedTextSeparator()
@@ -62,6 +68,7 @@ def tokenize_theorem(theorem_text, formula_dict, method):
 
     return tokens
 
+
 def get_theorem_tokens_from_doc(document_id, method, cursor):
     doc_theorems = get_theorems_from_doc(document_id, cursor)
     formula_dict = get_formulas_from_doc(document_id, cursor)
@@ -73,9 +80,11 @@ def get_theorem_tokens_from_doc(document_id, method, cursor):
 
     return theorem_token_list
 
+
 def get_all_theorems_as_token_list(method, cursor):
     document_ids = get_all_document_ids(cursor)
     return (theorem for document_id in document_ids for theorem in get_theorem_tokens_from_doc(document_id, method, cursor))
+
 
 def calc_word_counts(items):
     global_token_counts = {}
@@ -87,10 +96,12 @@ def calc_word_counts(items):
 
     return global_token_counts
 
+
 def build_text_token_dict(global_feature_counts, min_count):
     frequent_tokens = map(lambda i: i[0], filter(lambda c: c[1] >= min_count, global_feature_counts.items()))
     token2index_map = dict(zip(sorted(frequent_tokens), range(len(frequent_tokens))))
     return token2index_map
+
 
 def build_raw_csr_matrix(items, token2index_map):
     item_maps = []
@@ -120,24 +131,24 @@ if __name__ == "__main__":
     f.close()"""
 
     # === build text token dict
-    """token_counts = json.load(open("derived_data/theorem_lintoken_counts.json"))
-    text_token_dict = build_text_token_dict(token_counts, 5)
+    token_counts = json.load(open("derived_data/theorem_kristiantotoken_counts.json"))
+    text_token_dict = build_text_token_dict(token_counts, 3)
 
-    f = open("derived_data/theorem_lintoken2index_map.json", "w")
-    f.write(json.dumps(token2IndexMap))
-    f.close()"""
+    f = open("derived_data/theorem_kristiantotoken2index_map.json", "w")
+    f.write(json.dumps(text_token_dict))
+    f.close()
 
     # === create raw csr_matrix for theorems
-    token2index_map = json.load(open("derived_data/theorem_lintoken2index_map.json"))
-    theorem_generator = itertools.islice(get_all_theorems_as_token_list("lin", cursor), 0, 100)
+    """token2index_map = json.load(open("derived_data/theorem_kristiantotoken2index_map.json"))
+    theorem_generator = itertools.islice(get_all_theorems_as_token_list("kristianto", cursor), 0, 100)
 
     matrix, id_log = build_raw_csr_matrix(theorem_generator, token2index_map)
-    save_csr_matrix(matrix, "theorem_lin_raw_tdm")
+    save_csr_matrix(matrix, "derived_data/theorem_lin_raw_tdm")
 
-    f = open("theorem_lin_raw_tdm_ids", "w")
+    f = open("derived_data/theorem_lin_raw_tdm_ids", "w")
     for theorem_id in id_log:
         f.write(theorem_id[0] + ";" + theorem_id[1] + "\n")
-    f.close()
+    f.close()"""
 
     # === train and dump tf-idf model for theorem texts
     """raw_theorem_tdm = load_csr_matrix("derived_data/theorem_lin_raw_tdm.npz")
@@ -178,10 +189,10 @@ if __name__ == "__main__":
     joblib.dump(model, "lin_topic_model")"""
 
     # print topic words
-    """model = joblib.load("topic_model")
+    """model = joblib.load("models/lin_topic_model")
     topic_word = model.topic_word_
     n_top_words = 20
-    token2index_map = json.load(open("derived_data/theorem_gtoken2index_map.json"))
+    token2index_map = json.load(open("derived_data/theorem_lintoken2index_map.json"))
     vocab = map(lambda x: x[0], sorted(token2index_map.items(), key=lambda x: x[1]))
 
     for i, topic_dist in enumerate(topic_word):
@@ -190,11 +201,102 @@ if __name__ == "__main__":
 
     # transform matrix
     """raw_theorem_tdm = load_csr_matrix("derived_data/theorem_raw_tdm.npz")
-    model = joblib.load("topic_model")
+    model = joblib.load("models/topic_model")
     for i in range(10):
         print model.doc_topic_[i, :].tolist()
         print ""
     """
+
+    # === calc author probability
+    """
+    author_theorem_map = {}
+    theorem_author_map = {}
+    index = 0
+    f = open("derived_data/theorem_raw_tdm_ids_with_authors")
+    for line in f:
+        x = line.split(";")
+        document_id = x[0]
+        theorem_id = x[1]
+
+        authors = [x[2]]
+        author2 = x[3].strip()
+        if author2 != "":
+            authors.append(author2)
+
+        for author in authors:
+            if author not in author_theorem_map:
+                author_theorem_map[author] = []
+
+            if index not in theorem_author_map:
+                theorem_author_map[index] = []
+
+            author_theorem_map[author].append((document_id, theorem_id, index))
+            theorem_author_map[index].append(author)
+        index += 1
+    f.close()
+
+    # print sorted(map(lambda x: (x[0], len(x[1])), author_theorem_map.items()), key=lambda x: x[1], reverse=True)[:20]
+    author_query = "Paolo Lipparini(None)"
+    # author_query = "Jnos Kollr(kollar.janos)"
+
+    author_theorems = map(
+        lambda thm: (thm[0], thm[1], thm[2], Fraction(1, len(author_theorem_map[author_query]))),
+        author_theorem_map[author_query]
+    )
+
+    # model = joblib.load("models/topic_model")
+    # theorem_topic_matrix = model.doc_topic_
+    # joblib.dump(theorem_topic_matrix, "ttm")
+    theorem_topic_matrix = joblib.load("ttm")
+    num_theorems, num_topics = theorem_topic_matrix.shape
+
+    # sum of all topic allocations is 1 for each theorem
+    topics_from_theorems = {}
+    for doc_id, theorem_id, index, theorem_prop in author_theorems:
+        theorem_vector = theorem_topic_matrix[index,:].tolist()
+
+        for topic_index in range(num_topics):
+            topic_value = theorem_vector[topic_index]
+            topic_prop = theorem_prop * Fraction(topic_value)
+            if topic_index not in topics_from_theorems:
+                topics_from_theorems[topic_index] = Fraction(0)
+
+            topics_from_theorems[topic_index] += topic_prop
+
+    theorems_from_topics = {}
+    for topic_index in range(num_topics):
+        print topic_index
+        topic_prop = topics_from_theorems[topic_index]
+        topic_vector = theorem_topic_matrix[:,topic_index].tolist()
+        topic_sum = sum(topic_vector)
+
+        for theorem_index in range(num_theorems):
+            theorem_value = topic_vector[theorem_index]
+            theorem_prop = topic_prop * (theorem_value/topic_sum)
+            if theorem_index not in theorems_from_topics:
+                theorems_from_topics[theorem_index] = 0
+
+            theorems_from_topics[theorem_index] += theorem_prop
+
+    x = Fraction(0)
+    for index, prob in theorems_from_topics.items():
+        x += prob
+
+    print float(x)
+
+    author_probs = {}
+    for index, prob in theorems_from_topics.items():
+        authors = theorem_author_map[index]
+        for author in authors:
+            if author not in author_probs:
+                author_probs[author] = 0
+
+            author_probs[author] += prob / len(authors)
+
+    print sorted(author_probs.items(), key=lambda x: x[1], reverse=True)[:20]
+
+"""
+
     # === train svm
 """
     # read matrix
