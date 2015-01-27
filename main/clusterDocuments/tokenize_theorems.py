@@ -90,7 +90,7 @@ def calc_word_counts(items):
     global_token_counts = {}
     item_count = 1
     for id, tokens in items:
-        print id + " (" + str(item_count) + ")"
+        print str(id) + " (" + str(item_count) + ")"
         add_to_dict(global_token_counts, group_and_count(tokens))
         item_count += 1
 
