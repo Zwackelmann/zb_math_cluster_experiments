@@ -13,7 +13,7 @@ import numpy as np
 import itertools
 import math
 from fractions import Fraction
-from gensim.models.ldamodel import LdaModel
+# from gensim.models.ldamodel import LdaModel
 
 
 def get_paragraphs_from_doc(document_id, data_basis, cursor):
@@ -167,13 +167,13 @@ if __name__ == "__main__":
     interesting_settings = [
         # {"data_basis": "only_theorems", "token_method": "lin", "granularity": "paragraphs"},
         # {"data_basis": "only_theorems", "token_method": "lin", "granularity": "documents"},
-        {"data_basis": "only_theorems", "token_method": "kristianto", "granularity": "paragraphs"},
-        {"data_basis": "only_theorems", "token_method": "kristianto", "granularity": "documents"},
+        # {"data_basis": "only_theorems", "token_method": "kristianto", "granularity": "paragraphs"},
+        # {"data_basis": "only_theorems", "token_method": "kristianto", "granularity": "documents"},
         # {"data_basis": "only_theorems", "token_method": "plaintext", "granularity": "paragraphs"},
         # {"data_basis": "only_theorems", "token_method": "plaintext", "granularity": "documents"},
-        # {"data_basis": "full_text", "token_method": "lin", "granularity": "documents"},
-        {"data_basis": "full_text", "token_method": "kristianto", "granularity": "documents"},
-        # {"data_basis": "full_text", "token_method": "plaintext", "granularity": "documents"}
+        {"data_basis": "full_text", "token_method": "lin", "granularity": "documents"},
+        # {"data_basis": "full_text", "token_method": "kristianto", "granularity": "documents"},
+        {"data_basis": "full_text", "token_method": "plaintext", "granularity": "documents"}
     ]
 
     for setting in interesting_settings:
@@ -183,6 +183,15 @@ if __name__ == "__main__":
         granularity = setting["granularity"]
 
         debug_max_items = None
+
+        if token_method == "lin" or token_method == "kristianto":
+            intended_amount_of_formula_tokens = 10000
+            intended_amount_of_text_tokens = 10000
+        elif token_method == "plaintext":
+            intended_amount_of_formula_tokens = None
+            intended_amount_of_text_tokens = 20000
+        else:
+            raise ValueError("token_method must be either 'lin', 'kristianto' or 'plaintext'")
 
         # === calc word counts
         if granularity == "paragraphs":
@@ -229,11 +238,25 @@ if __name__ == "__main__":
         f.close()
 
         # === train and dump tf-idf model for theorem texts
-        """raw_theorem_tdm = load_csr_matrix("derived_data/theorem_lin_raw_tdm.npz")
-        tfidf_trans = TfidfTransformer()
-        tfidf_trans.fit(raw_theorem_tdm)
+        # raw_tdm = load_csr_matrix("derived_data/" + setting_string(data_basis, token_method, granularity) + "__raw_tdm.npz")
+        # tfidf_trans = TfidfTransformer()
+        # tfidf_trans.fit(raw_tdm)
 
-        joblib.dump(tfidf_trans, "models/lin_raw_theorem_tfidf_model")"""
+        # joblib.dump(tfidf_trans, "models/" + setting_string(data_basis, token_method, granularity) + "__tfidf_model")
+
+        # === retrieve best tf-idf terms
+        # raw_tdm = load_csr_matrix("derived_data/" + setting_string(data_basis, token_method, granularity) + "__raw_tdm.npz")
+        # tfidf_trans = joblib.load("models/" + setting_string(data_basis, token_method, granularity) + "__tfidf_model")
+
+        # vocab = json.load(open("derived_data/" + setting_string(data_basis, token_method, granularity) + "__token2index_map.json"))
+        # text_token_indexes = sorted(map(lambda i: i[1], filter(lambda i: i[0][:2] == "t:", vocab.items())))
+        # formula_token_indexes = sorted(map(lambda i: i[1], filter(lambda i: i[0][:2] != "t:", vocab.items())))
+
+        # tfidf_tdm = tfidf_trans.transform(raw_tdm)
+        # token_scores = list(enumerate(tfidf_tdm.sum(axis=0).tolist()[0]))
+
+        # text_token_scores = sorted(itemgetter(*text_token_indexes)(token_scores), key=lambda x: x[1], reverse=True)
+        # formula_token_scores = sorted(itemgetter(*formula_token_indexes)(token_scores), key=lambda x: x[1], reverse=True)
 
         # === append author information to theorem ids
         """f = open("derived_data/theorem_raw_tdm_ids")
