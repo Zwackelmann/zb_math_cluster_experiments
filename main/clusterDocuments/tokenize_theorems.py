@@ -13,6 +13,8 @@ import numpy as np
 import itertools
 import math
 from fractions import Fraction
+from scipy.sparse import csr_matrix
+
 # from gensim.models.ldamodel import LdaModel
 
 
@@ -56,7 +58,7 @@ def get_formulas_from_doc(document_id, cursor):
     return formula_dict
 
 
-def tokenize_paragraph(paragraph_text, formula_dict, method):
+def tokenize_paragraph(paragraph_text, formula_dict, method, config_args):
     sep = MixedTextSeparator()
     ft = FormulaTokenizer()
     tt = TextTokenizer()
@@ -67,9 +69,9 @@ def tokenize_paragraph(paragraph_text, formula_dict, method):
         if type(part) is MixedTextSeparator.FormulaId:
             if part.fid in formula_dict:
                 if method == "kristianto":
-                    tokens.extend(ft.tokenize(formula_dict[part.fid]['c_math_ml'], method))
+                    tokens.extend(ft.tokenize(formula_dict[part.fid]['c_math_ml'], method, config_args))
                 elif method == "lin":
-                    tokens.extend(ft.tokenize(formula_dict[part.fid]['c_math_ml'], method))
+                    tokens.extend(ft.tokenize(formula_dict[part.fid]['c_math_ml'], method, config_args))
                 elif method == "plaintext":
                     pass
                 else:
@@ -84,39 +86,39 @@ def tokenize_paragraph(paragraph_text, formula_dict, method):
     return tokens
 
 
-def get_paragraph_tokens_from_doc(document_id, method, data_basis, cursor):
+def get_paragraph_tokens_from_doc(document_id, method, data_basis, cursor, config_args={}):
     doc_paragraphs = get_paragraphs_from_doc(document_id, data_basis, cursor)
     formula_dict = get_formulas_from_doc(document_id, cursor)
 
     paragraph_token_list = []
     for paragraph_id, paragraph in doc_paragraphs.items():
-        paragraph_tokens = tokenize_paragraph(paragraph['text'], formula_dict, method)
+        paragraph_tokens = tokenize_paragraph(paragraph['text'], formula_dict, method, config_args)
         paragraph_token_list.append(((document_id, paragraph_id), paragraph_tokens))
 
     return paragraph_token_list
 
 
-def get_all_paragraphs_as_token_list(method, data_basis, cursor, debug_max_items=None):
+def get_all_paragraphs_as_token_list(method, data_basis, cursor, config_args={}):
     document_ids = get_all_document_ids(cursor)
 
-    gen = (paragraph for document_id in document_ids for paragraph in get_paragraph_tokens_from_doc(document_id, method, data_basis, cursor))
-    if debug_max_items is None:
+    gen = (paragraph for document_id in document_ids for paragraph in get_paragraph_tokens_from_doc(document_id, method, data_basis, cursor, config_args=config_args))
+    if config_args.get("debug_max_items") is None:
         return gen
     else:
-        return itertools.islice(gen, 0, debug_max_items)
+        return itertools.islice(gen, 0, config_args["debug_max_items"])
 
 
-def get_all_documents_as_token_list(method, data_basis, cursor, debug_max_items=None):
+def get_all_documents_as_token_list(method, data_basis, cursor, config_args={}):
     document_ids = get_all_document_ids(cursor)
     count = 0
 
     for document_id in document_ids:
         doc_tokens = {}
-        paragraphs = get_paragraph_tokens_from_doc(document_id, method, data_basis, cursor)
+        paragraphs = get_paragraph_tokens_from_doc(document_id, method, data_basis, cursor, config_args=config_args)
         for id, tokens in paragraphs:
             add_to_dict(doc_tokens, group_and_count(tokens))
 
-        if debug_max_items is not None and count >= debug_max_items:
+        if config_args.get("debug_max_items") is not None and count >= config_args["debug_max_items"]:
             return
 
         count += 1
@@ -160,7 +162,28 @@ def build_raw_csr_matrix(items, token2index_map):
 def setting_string(data_basis, token_method, granularity):
     return data_basis + "_" + token_method + "_" + granularity
 
-if __name__ == "__main__":
+
+def matrix_prune(mat, factor):
+    newdata = map(lambda x: float(x)/factor, mat.data)
+    return csr_matrix((newdata, mat.indices, mat.indptr), shape=mat.shape)
+
+
+def row_wise_norm(mat):
+    matcopy = mat.copy()
+    matcopy.data **= 2
+    return np.transpose(np.array(map(lambda x: math.sqrt(x[0]), matcopy.sum(axis=1).tolist()), ndmin=2))
+
+
+def avg_row_norm(mat):
+    row_norms = map(lambda x: x[0], row_wise_norm(mat).tolist())
+    return sum(row_norms) / len(row_norms)
+
+
+def non_zero_row_indexes(mat):
+    return map(lambda x: x[0], filter(lambda x: x[1][0] != 0, enumerate(mat.sum(axis=1).tolist())))
+
+
+if __name__ == "__main__" and False:
     db = connect_to_db()
     cursor = db.cursor()
 
@@ -173,7 +196,7 @@ if __name__ == "__main__":
         # {"data_basis": "only_theorems", "token_method": "plaintext", "granularity": "documents"},
         {"data_basis": "full_text", "token_method": "lin", "granularity": "documents"},
         # {"data_basis": "full_text", "token_method": "kristianto", "granularity": "documents"},
-        {"data_basis": "full_text", "token_method": "plaintext", "granularity": "documents"}
+        # {"data_basis": "full_text", "token_method": "plaintext", "granularity": "documents"}
     ]
 
     for setting in interesting_settings:
@@ -182,7 +205,10 @@ if __name__ == "__main__":
         token_method = setting["token_method"]
         granularity = setting["granularity"]
 
-        debug_max_items = None
+        config_args = {
+            "debug_max_items": None,
+            "lin_max_token_length": 255
+        }
 
         if token_method == "lin" or token_method == "kristianto":
             intended_amount_of_formula_tokens = 10000
@@ -195,40 +221,40 @@ if __name__ == "__main__":
 
         # === calc word counts
         if granularity == "paragraphs":
-            paragraph_generator = get_all_paragraphs_as_token_list(token_method, data_basis, cursor, debug_max_items=debug_max_items)
+            paragraph_generator = get_all_paragraphs_as_token_list(token_method, data_basis, cursor, config_args=config_args)
             token_counts = calc_word_counts(paragraph_generator)
         elif granularity == "documents":
-            document_generator = get_all_documents_as_token_list(token_method, data_basis, cursor, debug_max_items=debug_max_items)
+            document_generator = get_all_documents_as_token_list(token_method, data_basis, cursor, config_args=config_args)
             token_counts = calc_word_counts(document_generator)
         else:
             raise ValueError("granularity must be either paragraphs or documents")
 
-        f = open("derived_data/" + setting_string(data_basis, token_method, granularity) + "__token_counts.json", "w")
+        f = open("derived_data/" + setting_string(**setting) + "__token_counts.json", "w")
         f.write(json.dumps(token_counts))
         f.close()
 
         # === build text token dict
-        token_counts = json.load(open("derived_data/" + setting_string(data_basis, token_method, granularity) + "__token_counts.json"))
+        token_counts = json.load(open("derived_data/" + setting_string(**setting) + "__token_counts.json"))
         text_token_dict = build_text_token_dict(token_counts, 3)
 
-        f = open("derived_data/" + setting_string(data_basis, token_method, granularity) + "__token2index_map.json", "w")
+        f = open("derived_data/" + setting_string(**setting) + "__token2index_map.json", "w")
         f.write(json.dumps(text_token_dict))
         f.close()
 
         # === create raw csr_matrix for theorems
-        token2index_map = json.load(open("derived_data/" + setting_string(data_basis, token_method, granularity) + "__token2index_map.json"))
+        token2index_map = json.load(open("derived_data/" + setting_string(**setting) + "__token2index_map.json"))
         if granularity == "paragraphs":
-            paragraph_generator = get_all_paragraphs_as_token_list(token_method, data_basis, cursor, debug_max_items=debug_max_items)
+            paragraph_generator = get_all_paragraphs_as_token_list(token_method, data_basis, cursor, config_args=config_args)
             matrix, id_log = build_raw_csr_matrix(paragraph_generator, token2index_map)
         elif granularity == "documents":
-            document_generator = get_all_documents_as_token_list(token_method, data_basis, cursor, debug_max_items=debug_max_items)
+            document_generator = get_all_documents_as_token_list(token_method, data_basis, cursor, config_args=config_args)
             matrix, id_log = build_raw_csr_matrix(document_generator, token2index_map)
         else:
             raise ValueError("granularity must be either paragraphs or documents")
 
-        save_csr_matrix(matrix, "derived_data/" + setting_string(data_basis, token_method, granularity) + "__raw_tdm")
+        save_csr_matrix(matrix, "derived_data/" + setting_string(**setting) + "__raw_tdm")
 
-        f = open("derived_data/" + setting_string(data_basis, token_method, granularity) + "__ids", "w")
+        f = open("derived_data/" + setting_string(**setting) + "__ids", "w")
         if granularity == "paragraphs":
             for id in id_log:
                 f.write(id[0] + ";" + id[1] + "\n")
@@ -238,17 +264,19 @@ if __name__ == "__main__":
         f.close()
 
         # === train and dump tf-idf model for theorem texts
-        # raw_tdm = load_csr_matrix("derived_data/" + setting_string(data_basis, token_method, granularity) + "__raw_tdm.npz")
+        # raw_tdm = load_csr_matrix("derived_data/" + setting_string(**setting) + "__raw_tdm.npz")
         # tfidf_trans = TfidfTransformer()
         # tfidf_trans.fit(raw_tdm)
 
-        # joblib.dump(tfidf_trans, "models/" + setting_string(data_basis, token_method, granularity) + "__tfidf_model")
+        # joblib.dump(tfidf_trans, "models/" + setting_string(**setting) + "__tfidf_model")
 
         # === retrieve best tf-idf terms
-        # raw_tdm = load_csr_matrix("derived_data/" + setting_string(data_basis, token_method, granularity) + "__raw_tdm.npz")
-        # tfidf_trans = joblib.load("models/" + setting_string(data_basis, token_method, granularity) + "__tfidf_model")
+        # raw_tdm = load_csr_matrix("derived_data/" + setting_string(**setting) + "__raw_tdm.npz")
+        # raw_tdm = raw_tdm[non_zero_row_indexes(raw_tdm), :]
 
-        # vocab = json.load(open("derived_data/" + setting_string(data_basis, token_method, granularity) + "__token2index_map.json"))
+        # tfidf_trans = joblib.load("models/" + setting_string(**setting) + "__tfidf_model")
+
+        # vocab = json.load(open("derived_data/" + setting_string(**setting) + "__token2index_map.json"))
         # text_token_indexes = sorted(map(lambda i: i[1], filter(lambda i: i[0][:2] == "t:", vocab.items())))
         # formula_token_indexes = sorted(map(lambda i: i[1], filter(lambda i: i[0][:2] != "t:", vocab.items())))
 
@@ -257,6 +285,15 @@ if __name__ == "__main__":
 
         # text_token_scores = sorted(itemgetter(*text_token_indexes)(token_scores), key=lambda x: x[1], reverse=True)
         # formula_token_scores = sorted(itemgetter(*formula_token_indexes)(token_scores), key=lambda x: x[1], reverse=True)
+
+        # best_text_token_indexes = map(lambda x: x[0], text_token_scores[:intended_amount_of_text_tokens])
+        # best_formula_token_indexes = map(lambda x: x[0], formula_token_scores[:intended_amount_of_formula_tokens])
+
+        # raw_text_tdm = raw_tdm[:, best_text_token_indexes]
+        # raw_formula_tdm = matrix_prune(raw_tdm[:, best_formula_token_indexes], 1.30997314454)
+
+        # formula_prune_factor = avg_row_norm(raw_formula_tdm) / avg_row_norm(raw_text_tdm)
+        # print formula_prune_factor
 
         # === append author information to theorem ids
         """f = open("derived_data/theorem_raw_tdm_ids")

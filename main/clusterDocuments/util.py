@@ -853,7 +853,7 @@ formula_parse_error_count = 0
 class FormulaTokenizer:
     nodeCounter = 0
 
-    def tokenize(self, formula, method="kristianto"):
+    def tokenize(self, formula, method, config_args={}):
         if method == "kristianto":
             global formula_parse_error_count
             ch = FormulaTokenizer.FormulaContentHandler()
@@ -874,7 +874,11 @@ class FormulaTokenizer:
                 tokens = []
                 FormulaTokenizer.lin_tokenize(root, 1, tokens)
 
-                return map(lambda x: x[0], tokens)
+                mtokens = map(lambda x: x[0], tokens)
+                if "lin_max_token_length" not in config_args or config_args["lin_max_token_length"] is None:
+                    return mtokens
+                else:
+                    return filter(lambda x: len(x) <= config_args["lin_max_token_length"], mtokens)
 
             except xml.sax._exceptions.SAXParseException:
                 print "Formula parse error! (" + str(formula_parse_error_count) + ")"
