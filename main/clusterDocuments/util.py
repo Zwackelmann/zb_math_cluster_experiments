@@ -113,6 +113,33 @@ def build_csr_matrix(list_of_maps, token_2_index_map=None, num_attributes=None):
     return csr_matrix((data, (row, col)), shape=(shape_rows, shape_cols))
 
 
+def vertically_append_matrix(srcMatrix, appendMatrix):
+    numRows = srcMatrix.shape[0]
+    numSrcCols = srcMatrix.shape[1]
+    totalNumCols = srcMatrix.shape[1]+appendMatrix.shape[1]
+
+    newData = []
+    newIndices = []
+    newIndptr = [0]
+
+    currSrcOffset = 0
+    currAppendOffset = 0
+    for currRow in range(numRows):
+        nextSrcRow = srcMatrix.indptr[currRow+1]
+        nextAppendRow = appendMatrix.indptr[currRow+1]
+
+        newData.extend(srcMatrix.data[currSrcOffset:nextSrcRow])
+        newData.extend(appendMatrix.data[currAppendOffset:nextAppendRow])
+        newIndices.extend(srcMatrix.indices[currSrcOffset:nextSrcRow])
+        newIndices.extend(map(lambda x: x+numSrcCols, appendMatrix.indices[currAppendOffset:nextAppendRow]))
+        newIndptr.append(newIndptr[-1]+(nextSrcRow-currSrcOffset)+(nextAppendRow-currAppendOffset))
+
+        currSrcOffset += (nextSrcRow-currSrcOffset)
+        currAppendOffset += (nextAppendRow-currAppendOffset)
+
+    return csr_matrix((np.array(newData), np.array(newIndices), np.array(newIndptr)), shape=(numRows, totalNumCols))
+
+
 # db
 def connect_to_db():
     credentials = json.load(open("db_connect.json"))

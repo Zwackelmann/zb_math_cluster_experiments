@@ -1,5 +1,6 @@
 from util import flatten, connect_to_db, get_all_document_ids, add_to_dict, FormulaTokenizer, MixedTextSeparator
 from util import TextTokenizer, group_and_count, build_csr_matrix, save_csr_matrix, load_csr_matrix
+from util import vertically_append_matrix
 from sklearn.feature_extraction.text import TfidfTransformer
 import json
 import re
@@ -164,7 +165,7 @@ def setting_string(data_basis, token_method, granularity):
 
 
 def matrix_prune(mat, factor):
-    newdata = map(lambda x: float(x)/factor, mat.data)
+    newdata = np.array(map(lambda x: float(x)*factor, mat.data))
     return csr_matrix((newdata, mat.indices, mat.indptr), shape=mat.shape)
 
 
@@ -183,18 +184,18 @@ def non_zero_row_indexes(mat):
     return map(lambda x: x[0], filter(lambda x: x[1][0] != 0, enumerate(mat.sum(axis=1).tolist())))
 
 
-if __name__ == "__main__" and False:
+if __name__ == "__main__":
     db = connect_to_db()
     cursor = db.cursor()
 
     interesting_settings = [
         # {"data_basis": "only_theorems", "token_method": "lin", "granularity": "paragraphs"},
-        # {"data_basis": "only_theorems", "token_method": "lin", "granularity": "documents"},
+        {"data_basis": "only_theorems", "token_method": "lin", "granularity": "documents"},
         # {"data_basis": "only_theorems", "token_method": "kristianto", "granularity": "paragraphs"},
         # {"data_basis": "only_theorems", "token_method": "kristianto", "granularity": "documents"},
         # {"data_basis": "only_theorems", "token_method": "plaintext", "granularity": "paragraphs"},
         # {"data_basis": "only_theorems", "token_method": "plaintext", "granularity": "documents"},
-        {"data_basis": "full_text", "token_method": "lin", "granularity": "documents"},
+        # {"data_basis": "full_text", "token_method": "lin", "granularity": "documents"},
         # {"data_basis": "full_text", "token_method": "kristianto", "granularity": "documents"},
         # {"data_basis": "full_text", "token_method": "plaintext", "granularity": "documents"}
     ]
@@ -205,17 +206,18 @@ if __name__ == "__main__" and False:
         token_method = setting["token_method"]
         granularity = setting["granularity"]
 
+        # === Config
         config_args = {
             "debug_max_items": None,
             "lin_max_token_length": 255
         }
 
         if token_method == "lin" or token_method == "kristianto":
-            intended_amount_of_formula_tokens = 10000
-            intended_amount_of_text_tokens = 10000
+            config_args["intended_amount_of_formula_tokens"] = 10000
+            config_args["intended_amount_of_text_tokens"] = 10000
         elif token_method == "plaintext":
-            intended_amount_of_formula_tokens = None
-            intended_amount_of_text_tokens = 20000
+            config_args["intended_amount_of_formula_tokens"] = None
+            config_args["intended_amount_of_text_tokens"] = 20000
         else:
             raise ValueError("token_method must be either 'lin', 'kristianto' or 'plaintext'")
 
@@ -260,7 +262,7 @@ if __name__ == "__main__" and False:
                 f.write(id[0] + ";" + id[1] + "\n")
         elif granularity == "documents":
             for id in id_log:
-                f.write(id)
+                f.write(id + "\n")
         f.close()
 
         # === train and dump tf-idf model for theorem texts
@@ -272,28 +274,64 @@ if __name__ == "__main__" and False:
 
         # === retrieve best tf-idf terms
         # raw_tdm = load_csr_matrix("derived_data/" + setting_string(**setting) + "__raw_tdm.npz")
-        # raw_tdm = raw_tdm[non_zero_row_indexes(raw_tdm), :]
+        # nz_row_indexes = non_zero_row_indexes(raw_tdm)
+        # raw_tdm = raw_tdm[nz_row_indexes, :]
 
         # tfidf_trans = joblib.load("models/" + setting_string(**setting) + "__tfidf_model")
 
         # vocab = json.load(open("derived_data/" + setting_string(**setting) + "__token2index_map.json"))
         # text_token_indexes = sorted(map(lambda i: i[1], filter(lambda i: i[0][:2] == "t:", vocab.items())))
         # formula_token_indexes = sorted(map(lambda i: i[1], filter(lambda i: i[0][:2] != "t:", vocab.items())))
+        # index2token_map = {index: token for token, index in vocab.items()}
 
         # tfidf_tdm = tfidf_trans.transform(raw_tdm)
         # token_scores = list(enumerate(tfidf_tdm.sum(axis=0).tolist()[0]))
+        # tfidf_tdm = None
 
         # text_token_scores = sorted(itemgetter(*text_token_indexes)(token_scores), key=lambda x: x[1], reverse=True)
         # formula_token_scores = sorted(itemgetter(*formula_token_indexes)(token_scores), key=lambda x: x[1], reverse=True)
 
-        # best_text_token_indexes = map(lambda x: x[0], text_token_scores[:intended_amount_of_text_tokens])
-        # best_formula_token_indexes = map(lambda x: x[0], formula_token_scores[:intended_amount_of_formula_tokens])
+        # if "intended_amount_of_text_tokens" in config_args:
+        #     best_text_token_indexes = map(lambda x: x[0], text_token_scores[:config_args["intended_amount_of_text_tokens"]])
+        # else:
+        #     best_text_token_indexes = map(lambda x: x[0], text_token_scores)
+
+        # if "intended_amount_of_formula_tokens" in config_args:
+        #     best_formula_token_indexes = map(lambda x: x[0], formula_token_scores[:config_args["intended_amount_of_formula_tokens"]])
+        # else:
+        #     best_formula_token_indexes = map(lambda x: x[0], formula_token_scores)
 
         # raw_text_tdm = raw_tdm[:, best_text_token_indexes]
-        # raw_formula_tdm = matrix_prune(raw_tdm[:, best_formula_token_indexes], 1.30997314454)
+        # raw_formula_tdm = raw_tdm[:, best_formula_token_indexes]
+        # raw_tdm = None
 
-        # formula_prune_factor = avg_row_norm(raw_formula_tdm) / avg_row_norm(raw_text_tdm)
-        # print formula_prune_factor
+        # float_term_tdm = matrix_prune(raw_text_tdm, 1.0)
+        # pruned_formula_tdm = matrix_prune(raw_formula_tdm, avg_row_norm(raw_text_tdm) / avg_row_norm(raw_formula_tdm))
+        # raw_text_tdm = None
+        # raw_formula_tdm = None
+
+        # processed_tdm = vertically_append_matrix(float_term_tdm, pruned_formula_tdm)
+        # new_index2old_index_map = {new_index: old_index for new_index, old_index in enumerate(best_text_token_indexes)}
+        # new_index2old_index_map.update({new_index+len(best_text_token_indexes): old_index for new_index, old_index in enumerate(best_formula_token_indexes)})
+
+        # new_token2index_map = {}
+        # for new_index, old_index in new_index2old_index_map.items():
+        #     new_token2index_map[index2token_map[old_index]] = new_index
+
+        # f = open("derived_data/" + setting_string(**setting) + "__ids")
+        # count = 0
+        # new_ids = []
+        # for line in f:
+        #     if count in nz_row_indexes:
+        #         new_ids.append(line.strip())
+
+        #     count += 1
+        # f.close()
+
+        # print len(new_token2index_map)
+        # print len(new_ids)
+        # print processed_tdm.shape
+        # print count
 
         # === append author information to theorem ids
         """f = open("derived_data/theorem_raw_tdm_ids")
