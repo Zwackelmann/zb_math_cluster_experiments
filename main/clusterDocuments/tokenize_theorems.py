@@ -184,20 +184,56 @@ def non_zero_row_indexes(mat):
     return map(lambda x: x[0], filter(lambda x: x[1][0] != 0, enumerate(mat.sum(axis=1).tolist())))
 
 
+def tf_idf_scores(mat, vocab):
+    tfidf_trans = TfidfTransformer();
+    tfidf_mat = tfidf_trans.fit_transform(mat)
+    token_scores = list(enumerate(tfidf_mat.sum(axis=0).tolist()[0]))
+
+    text_token_indexes = sorted(map(lambda i: i[1], filter(lambda i: i[0][:2] == "t:", vocab.items())))
+    formula_token_indexes = sorted(map(lambda i: i[1], filter(lambda i: i[0][:2] != "t:", vocab.items())))
+    index2token_map = {index: token for token, index in vocab.items()}
+
+    text_token_scores = sorted(itemgetter(*text_token_indexes)(token_scores), key=lambda x: x[1], reverse=True)
+    formula_token_scores = sorted(itemgetter(*formula_token_indexes)(token_scores), key=lambda x: x[1], reverse=True)
+
+    return text_token_scores, formula_token_scores
+
+
+def select_best_tokens(text_token_scores, formula_token_scores, config_args):
+    if "intended_amount_of_text_tokens" in config_args:
+        best_text_token_indexes = map(lambda x: x[0], text_token_scores[:config_args["intended_amount_of_text_tokens"]])
+    else:
+        best_text_token_indexes = map(lambda x: x[0], text_token_scores)
+
+    if "intended_amount_of_formula_tokens" in config_args:
+        best_formula_token_indexes = map(lambda x: x[0], formula_token_scores[:config_args["intended_amount_of_formula_tokens"]])
+    else:
+        best_formula_token_indexes = map(lambda x: x[0], formula_token_scores)
+
+    return best_text_token_indexes, best_formula_token_indexes
+
+
+def combine_with_equal_scale(mat1, mat2):
+    float_mat1 = matrix_prune(mat1, 1.0)
+    pruned_mat2 = matrix_prune(mat2, avg_row_norm(mat1) / avg_row_norm(mat2))
+
+    return vertically_append_matrix(float_mat1, pruned_mat2)
+
+
 if __name__ == "__main__":
     db = connect_to_db()
     cursor = db.cursor()
 
     interesting_settings = [
         # {"data_basis": "only_theorems", "token_method": "lin", "granularity": "paragraphs"},
-        {"data_basis": "only_theorems", "token_method": "lin", "granularity": "documents"},
+        # {"data_basis": "only_theorems", "token_method": "lin", "granularity": "documents"},
         # {"data_basis": "only_theorems", "token_method": "kristianto", "granularity": "paragraphs"},
         # {"data_basis": "only_theorems", "token_method": "kristianto", "granularity": "documents"},
         # {"data_basis": "only_theorems", "token_method": "plaintext", "granularity": "paragraphs"},
         # {"data_basis": "only_theorems", "token_method": "plaintext", "granularity": "documents"},
-        # {"data_basis": "full_text", "token_method": "lin", "granularity": "documents"},
+        {"data_basis": "full_text", "token_method": "lin", "granularity": "documents"},
         # {"data_basis": "full_text", "token_method": "kristianto", "granularity": "documents"},
-        # {"data_basis": "full_text", "token_method": "plaintext", "granularity": "documents"}
+        {"data_basis": "full_text", "token_method": "plaintext", "granularity": "documents"}
     ]
 
     for setting in interesting_settings:
@@ -209,7 +245,7 @@ if __name__ == "__main__":
         # === Config
         config_args = {
             "debug_max_items": None,
-            "lin_max_token_length": 255
+            "lin_max_token_length": 200
         }
 
         if token_method == "lin" or token_method == "kristianto":
@@ -239,9 +275,8 @@ if __name__ == "__main__":
         token_counts = json.load(open("derived_data/" + setting_string(**setting) + "__token_counts.json"))
         text_token_dict = build_text_token_dict(token_counts, 3)
 
-        f = open("derived_data/" + setting_string(**setting) + "__token2index_map.json", "w")
-        f.write(json.dumps(text_token_dict))
-        f.close()
+        with open("derived_data/" + setting_string(**setting) + "__token2index_map.json", "w") as outfile:
+            json.dump(text_token_dict, outfile)
 
         # === create raw csr_matrix for theorems
         token2index_map = json.load(open("derived_data/" + setting_string(**setting) + "__token2index_map.json"))
@@ -275,42 +310,16 @@ if __name__ == "__main__":
         # === retrieve best tf-idf terms
         # raw_tdm = load_csr_matrix("derived_data/" + setting_string(**setting) + "__raw_tdm.npz")
         # nz_row_indexes = non_zero_row_indexes(raw_tdm)
+
         # raw_tdm = raw_tdm[nz_row_indexes, :]
+        # token2index_map = json.load(open("derived_data/" + setting_string(**setting) + "__token2index_map.json"))
+        # index2token_map = {index: token for token, index in token2index_map.items()}
 
-        # tfidf_trans = joblib.load("models/" + setting_string(**setting) + "__tfidf_model")
+        # text_token_scores, formula_token_scores = tf_idf_scores(raw_tdm, token2index_map)
+        # best_text_token_indexes, best_formula_token_indexes = select_best_tokens(text_token_scores, formula_token_scores, config_args)
 
-        # vocab = json.load(open("derived_data/" + setting_string(**setting) + "__token2index_map.json"))
-        # text_token_indexes = sorted(map(lambda i: i[1], filter(lambda i: i[0][:2] == "t:", vocab.items())))
-        # formula_token_indexes = sorted(map(lambda i: i[1], filter(lambda i: i[0][:2] != "t:", vocab.items())))
-        # index2token_map = {index: token for token, index in vocab.items()}
+        # processed_tdm = combine_with_equal_scale(raw_tdm[:, best_text_token_indexes], raw_tdm[:, best_formula_token_indexes])
 
-        # tfidf_tdm = tfidf_trans.transform(raw_tdm)
-        # token_scores = list(enumerate(tfidf_tdm.sum(axis=0).tolist()[0]))
-        # tfidf_tdm = None
-
-        # text_token_scores = sorted(itemgetter(*text_token_indexes)(token_scores), key=lambda x: x[1], reverse=True)
-        # formula_token_scores = sorted(itemgetter(*formula_token_indexes)(token_scores), key=lambda x: x[1], reverse=True)
-
-        # if "intended_amount_of_text_tokens" in config_args:
-        #     best_text_token_indexes = map(lambda x: x[0], text_token_scores[:config_args["intended_amount_of_text_tokens"]])
-        # else:
-        #     best_text_token_indexes = map(lambda x: x[0], text_token_scores)
-
-        # if "intended_amount_of_formula_tokens" in config_args:
-        #     best_formula_token_indexes = map(lambda x: x[0], formula_token_scores[:config_args["intended_amount_of_formula_tokens"]])
-        # else:
-        #     best_formula_token_indexes = map(lambda x: x[0], formula_token_scores)
-
-        # raw_text_tdm = raw_tdm[:, best_text_token_indexes]
-        # raw_formula_tdm = raw_tdm[:, best_formula_token_indexes]
-        # raw_tdm = None
-
-        # float_term_tdm = matrix_prune(raw_text_tdm, 1.0)
-        # pruned_formula_tdm = matrix_prune(raw_formula_tdm, avg_row_norm(raw_text_tdm) / avg_row_norm(raw_formula_tdm))
-        # raw_text_tdm = None
-        # raw_formula_tdm = None
-
-        # processed_tdm = vertically_append_matrix(float_term_tdm, pruned_formula_tdm)
         # new_index2old_index_map = {new_index: old_index for new_index, old_index in enumerate(best_text_token_indexes)}
         # new_index2old_index_map.update({new_index+len(best_text_token_indexes): old_index for new_index, old_index in enumerate(best_formula_token_indexes)})
 
@@ -328,10 +337,18 @@ if __name__ == "__main__":
         #     count += 1
         # f.close()
 
-        # print len(new_token2index_map)
-        # print len(new_ids)
-        # print processed_tdm.shape
-        # print count
+        # # save processed tdm
+        # save_csr_matrix(processed_tdm, "derived_data/" + setting_string(**setting) + "__processed_tdm")
+
+        # # save respective ids
+        # f = open("derived_data/" + setting_string(**setting) + "__processed_ids", "w")
+        # for id in new_ids:
+        #     f.write(id + "\n")
+        # f.close()
+
+        # # save token2index map
+        # with open("derived_data/" + setting_string(**setting) + "__processed_token2index_map.json", "w") as outfile:
+        #     json.dump(new_token2index_map, outfile)
 
         # === append author information to theorem ids
         """f = open("derived_data/theorem_raw_tdm_ids")
@@ -473,62 +490,85 @@ if __name__ == "__main__":
 
     """
 
-        # === train svm
-    """
-        # read matrix
-        raw_theorem_tdm = load_csr_matrix("derived_data/theorem_raw_tdm_by_doc.npz")
+        # # === train svm
+        # raw_theorem_tdm = load_csr_matrix("derived_data/" + setting_string(**setting) + "__processed_tdm.npz")
 
-        # read doc2msc map
-        f = open("raw_data/doc2msc", "r")
-        doc2msc_map = {}
-        for line in f:
-            x = line.split(";")
-            doc2msc_map[x[0].strip()] = x[1].strip()
-        f.close()
+        # # read doc2msc map
+        # f = open("raw_data/doc2msc", "r")
+        # doc2msc_map = {}
+        # for line in f:
+        #     x = line.split(";")
+        #     doc2msc_map[x[0].strip()] = x[1].strip()
+        # f.close()
 
-        # read document ids
-        f = open("derived_data/theorem_raw_tdm_by_doc_ids")
-        doc_ids = []
-        for line in f:
-            x = line.strip()
-            doc_ids.append(x)
+        # # read document ids
+        # f = open("derived_data/" + setting_string(**setting) + "__processed_ids")
+        # doc_ids = []
+        # for line in f:
+        #     x = line.strip()
+        #     doc_ids.append(x)
 
-        # create label map
-        target_class = "81"
-        label_vector = map(lambda id: None if id not in doc2msc_map else (1 if doc2msc_map[id][:2] == target_class else 0), doc_ids)
+        # msc_classes = [
+        #     "00", "01", "03", "05", "06", "08", "11", "12", "13", "14", "15", "16", "17", "18", "19",
+        #     "20", "22", "26", "28", "30", "31", "32", "33", "34", "35", "37", "39", "40", "41", "42",
+        #     "43", "44", "45", "46", "47", "49", "51", "52", "53", "54", "55", "57", "58", "60", "62",
+        #     "65", "67", "68", "70", "74", "76", "78", "80", "81", "82", "83", "85", "86", "90", "91",
+        #     "92", "93", "94", "97"
+        # ]
 
-        # determine train and test sets
-        test_indexes = []
-        train_indexes = []
-        random.seed(0)
+        # for target_class in msc_classes:
+        #     # create label map
+        #     label_vector = map(lambda id: None if id not in doc2msc_map else (1 if doc2msc_map[id][:2] == target_class else 0), doc_ids)
 
-        count = 0
-        for doc_id in doc_ids:
-            if doc_id in doc2msc_map:
-                if random.random() > 0.2:
-                    train_indexes.append(count)
-                else:
-                    test_indexes.append(count)
+        #     num_positives = 0
+        #     for x in label_vector:
+        #         if x == 1:
+        #             num_positives += 1
 
-            count += 1
+        #     # determine train and test sets
+        #     test_indexes = []
+        #     train_indexes = []
+        #     random.seed(0)
 
-        train_matrix = raw_theorem_tdm[train_indexes, :]
-        test_matrix = raw_theorem_tdm[test_indexes, :]
-        train_labels = itemgetter(*train_indexes)(label_vector)
-        test_labels = itemgetter(*test_indexes)(label_vector)
+        #     count = 0
+        #     for doc_id in doc_ids:
+        #         if doc_id in doc2msc_map:
+        #             if random.random() > 0.2:
+        #                 train_indexes.append(count)
+        #             else:
+        #                 test_indexes.append(count)
 
-        # train classifier
-        clf = svm.LinearSVC()
-        clf.fit(train_matrix, train_labels)
-        joblib.dump(clf, "models/theorem_raw_tdm_by_doc_svm_model")
+        #         count += 1
 
-        # predict test instances
-        clf = joblib.load("models/theorem_raw_tdm_by_doc_svm_model")
-        predictions = clf.predict(test_matrix).tolist()
+        #     train_matrix = raw_theorem_tdm[train_indexes, :]
+        #     test_matrix = raw_theorem_tdm[test_indexes, :]
+        #     train_labels = itemgetter(*train_indexes)(label_vector)
+        #     test_labels = itemgetter(*test_indexes)(label_vector)
 
-        # evaluate
-        evaluation_classes = map(lambda x: "tp" if x[0] == 1 and x[1] == 1 else ("fp" if x[0] == 1 and x[1] == 0 else ("fn" if x[0] == 0 and x[1] == 1 else "tn")), zip(predictions, test_labels))
-        grouped_evaluation_classes = group_and_count(evaluation_classes)
+        #     print "class: " + target_class
+        #     print "num positives: " + str(num_positives)
+        #     if num_positives > 0:
+        #         # train classifier
+        #         clf = svm.LinearSVC()
+        #         clf.fit(train_matrix, train_labels)
+        #         predictions = clf.predict(test_matrix).tolist()
 
-        print "precition: " + str(float(grouped_evaluation_classes["tp"])/(grouped_evaluation_classes["tp"] + grouped_evaluation_classes["fp"]))
-        print "recall: " + str(float(grouped_evaluation_classes["tp"])/(grouped_evaluation_classes["tp"] + grouped_evaluation_classes["fn"]))"""
+        #         # evaluate
+        #         evaluation_classes = map(lambda x: "tp" if x[0] == 1 and x[1] == 1 else ("fp" if x[0] == 1 and x[1] == 0 else ("fn" if x[0] == 0 and x[1] == 1 else "tn")), zip(predictions, test_labels))
+        #         grouped_evaluation_classes = {"tp": 0, "fp": 0, "fn": 0, "tn": 0}
+        #         grouped_evaluation_classes.update(group_and_count(evaluation_classes))
+
+        #         if grouped_evaluation_classes["tp"] + grouped_evaluation_classes["fp"] == 0:
+        #             print "precision: NaN"
+        #         else:
+        #             print "precition: " + str(float(grouped_evaluation_classes["tp"])/(grouped_evaluation_classes["tp"] + grouped_evaluation_classes["fp"]))
+
+        #         if grouped_evaluation_classes["tp"] + grouped_evaluation_classes["fn"] == 0:
+        #             print "recall: NaN"
+        #         else:
+        #             print "recall: " + str(float(grouped_evaluation_classes["tp"])/(grouped_evaluation_classes["tp"] + grouped_evaluation_classes["fn"]))
+        #     else:
+        #         print "precision: NaN"
+        #         print "recall: NaN"
+
+        #     print ""
