@@ -18,6 +18,7 @@ from scipy.sparse import csr_matrix
 from sklearn.decomposition import TruncatedSVD
 from sklearn.preprocessing import normalize, Normalizer
 
+from glove import Glove, Corpus
 # from gensim.models.ldamodel import LdaModel
 
 
@@ -129,6 +130,24 @@ def get_all_documents_as_token_list(method, data_basis, cursor, config_args={}):
         yield (document_id, doc_tokens)
 
 
+def get_all_documents_as_flat_token_list(method, data_basis, cursor, config_args={}):
+    document_ids = get_all_document_ids(cursor)
+    count = 0
+
+    for document_id in document_ids:
+        doc_tokens = []
+        paragraphs = get_paragraph_tokens_from_doc(document_id, method, data_basis, cursor, config_args=config_args)
+        for id, tokens in paragraphs:
+            doc_tokens.extend(tokens)
+
+        if config_args.get("debug_max_items") is not None and count >= config_args["debug_max_items"]:
+            return
+
+        count += 1
+
+        yield (document_id, doc_tokens)
+
+
 def calc_word_counts(items):
     global_token_counts = {}
     item_count = 1
@@ -195,12 +214,12 @@ def tf_idf_scores(mat, vocab):
     formula_token_indexes = sorted(map(lambda i: i[1], filter(lambda i: i[0][:2] != "t:", vocab.items())))
 
     if len(text_token_indexes) != 0:
-        text_token_scores = sorted(itemgetter(*text_token_indexes)(token_scores), key=lambda x: x[1], reverse=True)
+        text_token_scores = itemgetter(*text_token_indexes)(token_scores)
     else:
         text_token_scores = []
 
     if len(formula_token_indexes) != 0:
-        formula_token_scores = sorted(itemgetter(*formula_token_indexes)(token_scores), key=lambda x: x[1], reverse=True)
+        formula_token_scores = itemgetter(*formula_token_indexes)(token_scores)
     else:
         formula_token_scores = []
 
@@ -208,15 +227,18 @@ def tf_idf_scores(mat, vocab):
 
 
 def select_best_tokens(text_token_scores, formula_token_scores, config_args):
+    sorted_text_token_scores = sorted(text_token_scores, key=lambda x: x[1], reverse=True)
+    sorted_formula_token_scores = sorted(formula_token_scores, key=lambda x: x[1], reverse=True)
+
     if "intended_amount_of_text_tokens" in config_args:
-        best_text_token_indexes = map(lambda x: x[0], text_token_scores[:config_args["intended_amount_of_text_tokens"]])
+        best_text_token_indexes = map(lambda x: x[0], sorted_text_token_scores[:config_args["intended_amount_of_text_tokens"]])
     else:
-        best_text_token_indexes = map(lambda x: x[0], text_token_scores)
+        best_text_token_indexes = map(lambda x: x[0], sorted_text_token_scores)
 
     if "intended_amount_of_formula_tokens" in config_args:
-        best_formula_token_indexes = map(lambda x: x[0], formula_token_scores[:config_args["intended_amount_of_formula_tokens"]])
+        best_formula_token_indexes = map(lambda x: x[0], sorted_formula_token_scores[:config_args["intended_amount_of_formula_tokens"]])
     else:
-        best_formula_token_indexes = map(lambda x: x[0], formula_token_scores)
+        best_formula_token_indexes = map(lambda x: x[0], sorted_formula_token_scores)
 
     return best_text_token_indexes, best_formula_token_indexes
 
@@ -233,18 +255,78 @@ def combine_with_equal_scale(mat1, mat2):
     return vertically_append_matrix(float_mat1, pruned_mat2)
 
 
+def matrix2document_token_weights(mat, ids, index2token_map):
+    id_iter = iter(ids)
+    document_maps = {}
+    count = 0
+
+    for row in mat:
+        id = next(id_iter)
+        non_zero_ind = row.nonzero()[1].tolist()
+        non_zero_values = row[0, non_zero_ind].todense().tolist()[0]
+        document_map = dict(zip(map(lambda x: index2token_map[x], non_zero_ind), non_zero_values))
+        document_maps[id] = document_map
+
+        if count % 1000 == 0:
+            print count
+        count += 1
+    return document_maps
+
+
+if __name__ == "__main__":
+    # === mix kristianto and lin features
+    """kristianto_tdm = load_csr_matrix("derived_data/full_text_kristianto_documents__processed_tdm.npz")
+    kristianto_ids = []
+    with open("derived_data/full_text_kristianto_documents__processed_ids") as f:
+        for line in f:
+            x = line.strip()
+            kristianto_ids.append(x)
+
+    kristianto_token2index_map = json.load(open("derived_data/full_text_kristianto_documents__processed_token2index_map.json"))
+    kristianto_index2token_map = {index: token for token, index in kristianto_token2index_map.items()}
+    kristianto_document_token_weights = matrix2document_token_weights(kristianto_tdm, kristianto_ids, kristianto_index2token_map)
+
+    lin_tdm = load_csr_matrix("derived_data/full_text_lin_documents__processed_tdm.npz")
+    lin_ids = []
+    with open("derived_data/full_text_lin_documents__processed_ids") as f:
+        for line in f:
+            x = line.strip()
+            lin_ids.append(x)
+
+    lin_token2index_map = json.load(open("derived_data/full_text_lin_documents__processed_token2index_map.json"))
+    lin_index2token_map = {index: token for token, index in lin_token2index_map.items()}
+    lin_document_token_weights = matrix2document_token_weights(lin_tdm, lin_ids, lin_index2token_map)
+
+    all_doc_ids = set(kristianto_document_token_weights.keys()).union(lin_document_token_weights.keys())
+    unified_doc_maps = []
+    for doc_id in all_doc_ids:
+        lin_doc = lin_document_token_weights[doc_id]
+        kristianto_doc = kristianto_document_token_weights[doc_id]
+
+        unified_doc = lin_doc
+        for token, value in kristianto_doc.items():
+            if token in unified_doc and unified_doc[token] != kristianto_doc[token]:
+                raise ValueError("different token values for token " + token + " in document " + doc_id + "(" + unified_doc[token] + " and " + kristianto_doc[token] + ")")
+        unified_doc.update(kristianto_doc)
+
+        unified_doc_maps.append(unified_doc)
+
+    with open("foo", "w") as f:
+        json.dump(unified_doc_maps, f)"""
+
+
 if __name__ == "__main__":
     db = connect_to_db()
     cursor = db.cursor()
 
     interesting_settings = [
-        {"data_basis": "only_theorems", "token_method": "lin", "granularity": "paragraphs"},
-        {"data_basis": "only_theorems", "token_method": "lin", "granularity": "documents"},
-        {"data_basis": "only_theorems", "token_method": "kristianto", "granularity": "paragraphs"},
-        {"data_basis": "only_theorems", "token_method": "kristianto", "granularity": "documents"},
-        {"data_basis": "only_theorems", "token_method": "plaintext", "granularity": "paragraphs"},
+        # {"data_basis": "only_theorems", "token_method": "lin", "granularity": "paragraphs"},
+        # {"data_basis": "only_theorems", "token_method": "lin", "granularity": "documents"},
+        # {"data_basis": "only_theorems", "token_method": "kristianto", "granularity": "paragraphs"},
+        # {"data_basis": "only_theorems", "token_method": "kristianto", "granularity": "documents"},
+        # {"data_basis": "only_theorems", "token_method": "plaintext", "granularity": "paragraphs"},
         # {"data_basis": "only_theorems", "token_method": "plaintext", "granularity": "documents"},
-        # {"data_basis": "full_text", "token_method": "lin", "granularity": "documents"},
+        {"data_basis": "full_text", "token_method": "lin", "granularity": "documents"},
         # {"data_basis": "full_text", "token_method": "kristianto", "granularity": "documents"},
         # {"data_basis": "full_text", "token_method": "plaintext", "granularity": "documents"}
     ]
@@ -257,7 +339,7 @@ if __name__ == "__main__":
 
         # === Config
         config_args = {
-            "debug_max_items": None,
+            "debug_max_items": 10,
             "lin_max_token_length": 200
         }
 
@@ -330,6 +412,8 @@ if __name__ == "__main__":
 
         # text_token_scores, formula_token_scores = tf_idf_scores(raw_tdm, token2index_map)
         # best_text_token_indexes, best_formula_token_indexes = select_best_tokens(text_token_scores, formula_token_scores, config_args)
+        # # print map(lambda x: index2token_map[x], best_text_token_indexes[:500])
+        # # print map(lambda x: index2token_map[x], best_formula_token_indexes[:500])
 
         # processed_tdm = combine_with_equal_scale(raw_tdm[:, best_text_token_indexes], raw_tdm[:, best_formula_token_indexes])
 
@@ -388,22 +472,37 @@ if __name__ == "__main__":
         f.close()
         f2.close()"""
 
+        # === train glove
+        token2index_map = json.load(open("derived_data/" + setting_string(**setting) + "__processed_token2index_map.json"))
+        document_generator = get_all_documents_as_flat_token_list(token_method, data_basis, cursor, config_args=config_args)
+        corpus = (filter(lambda token: token in token2index_map, doc[1]) for doc in document_generator)
+        model = Corpus(dictionary=token2index_map)
+        model.fit(corpus)
+        model.save("models/" + setting_string(**setting) + "__glove")
+
         # === train lda
-        tdm = load_csr_matrix("derived_data/" + setting_string(**setting) + "__processed_tdm.npz")
-        model = lda.LDA(n_topics=250)
-        model.fit(tdm)
-        joblib.dump(model, "models/" + setting_string(**setting) + "__topic_model")
+        # tdm = load_csr_matrix("derived_data/" + setting_string(**setting) + "__processed_tdm.npz")
+        # token2index_map = json.load(open("derived_data/" + setting_string(**setting) + "__processed_token2index_map.json"))
+        # text_token_indexes = sorted(map(lambda i: i[1], filter(lambda i: i[0][:2] == "t:", token2index_map.items())))
+        # tdm = tdm[1000, text_token_indexes]
 
-        # print topic words
-        """model = joblib.load("models/lin_topic_model")
-        topic_word = model.topic_word_
-        n_top_words = 20
-        token2index_map = json.load(open("derived_data/theorem_lintoken2index_map.json"))
-        vocab = map(lambda x: x[0], sorted(token2index_map.items(), key=lambda x: x[1]))
+        # model = lda.LDA(n_topics=250)
+        # model.fit(tdm)
+        # joblib.dump(model, "models/" + setting_string(**setting) + "__topic_model")
 
-        for i, topic_dist in enumerate(topic_word):
-            topic_words = np.array(vocab)[np.argsort(topic_dist)][:-n_top_words:-1]
-            print "Topic {}: {}".format(i, " ".join(map(lambda x: x.encode("utf-8").strip(), topic_words)))"""
+        # # print topic words
+        # model = joblib.load("models/" + setting_string(**setting) + "__topic_model")
+        # topic_word = model.topic_word_
+        # n_top_words = 20
+        # token2index_map = json.load(open("derived_data/" + setting_string(**setting) + "__processed_token2index_map.json"))
+        # # vocab = map(lambda x: x[0], sorted(token2index_map.items(), key=lambda x: x[1]))
+        # index2token_map = {index: token for token, index in token2index_map.items()}
+
+        # for i, topic_dist in enumerate(topic_word):
+        #     print "Topic " + str(i) + ": " + repr(map(lambda x: index2token_map[x], np.argsort(topic_dist).tolist()[-100:]))
+        #     print ""
+        #     # topic_words = list(reversed(np.array(vocab)[np.argsort(topic_dist)].tolist()))[1000:1050]
+        #     # print "Topic {}: {}".format(i, " ".join(map(lambda x: x.encode("utf-8").strip(), topic_words)))
 
         # transform matrix
         """raw_theorem_tdm = load_csr_matrix("derived_data/theorem_raw_tdm.npz")
@@ -504,16 +603,16 @@ if __name__ == "__main__":
     """
 
         # === train svm
-        # frequent_msc_classes = ["05", "11", "14", "17", "20", "35", "37", "46", "53", "57", "60", "68", "81", "82"]
-        # msc_classes = [
-        #     "00", "01", "03", "05", "06", "08", "11", "12", "13", "14", "15", "16", "17", "18", "19",
-        #     "20", "22", "26", "28", "30", "31", "32", "33", "34", "35", "37", "39", "40", "41", "42",
-        #     "43", "44", "45", "46", "47", "49", "51", "52", "53", "54", "55", "57", "58", "60", "62",
-        #     "65", "67", "68", "70", "74", "76", "78", "80", "81", "82", "83", "85", "86", "90", "91",
-        #     "92", "93", "94", "97"
-        # ]
+        frequent_msc_classes = ["05", "11", "14", "17", "20", "35", "37", "46", "53", "57", "60", "68", "81", "82"]
+        msc_classes = [
+            "00", "01", "03", "05", "06", "08", "11", "12", "13", "14", "15", "16", "17", "18", "19",
+            "20", "22", "26", "28", "30", "31", "32", "33", "34", "35", "37", "39", "40", "41", "42",
+            "43", "44", "45", "46", "47", "49", "51", "52", "53", "54", "55", "57", "58", "60", "62",
+            "65", "67", "68", "70", "74", "76", "78", "80", "81", "82", "83", "85", "86", "90", "91",
+            "92", "93", "94", "97"
+        ]
 
-        # # read doc2msc map
+        # read doc2msc map
         # f = open("raw_data/doc2msc", "r")
         # doc2msc_map = {}
         # for line in f:
@@ -540,7 +639,7 @@ if __name__ == "__main__":
         # tfidf_tdm = TfidfTransformer().fit_transform(raw_tdm)
 
         # mats = [(raw_tdm, "raw")]
-        # for dim in [250, 300, 350]:
+        # for dim in []:
         #     for tfidf in [True]:
         #         for norm in [True]:
         #             label = "_".join(filter(lambda x: x is not None, [("tfidf" if tfidf else None), ("norm" if norm else None), ("lsi" + str(dim))]))
@@ -615,24 +714,27 @@ if __name__ == "__main__":
         #             recall = None
         #             f1 = None
 
-        #         print label
+        #         # print label
         #         print "class: " + target_class
-        #         print "num positives: " + str(num_positives)
-        #         print "precision : " + str(precision)
-        #         print "recall: " + str(recall)
-        #         print "f1: " + str(f1)
+        #         # print "num positives: " + str(num_positives)
+        #         # print "precision : " + str(precision)
+        #         # print "recall: " + str(recall)
+        #         print "f1: %0.3f" % f1
         #         print ""
 
         #         measures.append({"target_class": target_class, "label": label, "num_positives": num_positives, "precision": precision, "recall": recall, "f1": f1})
 
-        # with open("measures7.json", "w") as f:
+        # f1_results = map(lambda x: x['f1'], measures)
+        # print "makro f1: %0.3f" % (sum(f1_results)/len(f1_results))
+
+        # with open("measures_" + setting_string(**setting) + ".json", "w") as f:
         #     json.dump(measures, f)
 
-        # with open("labels7.json", "w") as f:
+        # with open("labels_" + setting_string(**setting) + ".json", "w") as f:
         #     json.dump(map(lambda x: x[1], mats), f)
 
-        # measures = json.load(open("measures6.json"))
-        # labels = json.load(open("labels6.json"))
+        # measures = json.load(open("measures_" + setting_string(**setting) + ".json"))
+        # labels = json.load(open("labels_" + setting_string(**setting) + ".json"))
         # for cl in msc_classes:
         #     m = filter(lambda x: x['target_class'] == cl, measures)
         #     res = sorted(map(lambda x: (x['label'], x['f1']), filter(lambda x: x['f1'] is not None and x['num_positives'] > 250, m)), key=lambda x: x[1], reverse=True)
@@ -651,8 +753,8 @@ if __name__ == "__main__":
         #         print ""
 
         # akku = {}
-        # # for l in ['raw', 'tfidf', 'lsi250', 'lsi500', 'tfidflsi250', 'tfidtlsi500']: # labels for measures.json
-        # # for l in ["raw", "norm", "lsi500", "lsi750"]: # labes for measures2.json
+        # for l in ['raw', 'tfidf', 'lsi250', 'lsi500', 'tfidflsi250', 'tfidtlsi500']: # labels for measures.json
+        # for l in ["raw", "norm", "lsi500", "lsi750"]: # labes for measures2.json
         # for l in labels:
         #     akku[l] = 0.0
 
