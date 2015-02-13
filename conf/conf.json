@@ -1,0 +1,7 @@
+{
+    "lin_max_token_length": 200,
+    "debug_max_items": null,
+    "force_gen": false,
+    "min_token_count": 3,
+    "max_author_rank": 2
+}
