@@ -4,6 +4,7 @@ import json
 from pprint import pprint
 from main.clusterDocuments.util import get_filenames_and_filepaths, files_in_dict, DocumentParser
 from string import printable
+import time
 
 conn = httplib.HTTPConnection("api.elsevier.com:80")
 
@@ -28,13 +29,10 @@ def get_doi_data(doi):
     )
     res = conn.getresponse()
 
-    print res.status
-    return res.read()
+    return res.status, res.read()
 
-# filenames = files_in_dict("raw_data/test_documents", with_path=False)
 p = DocumentParser()
-
-for filename, filepath in zip(get_filenames_and_filepaths("raw_data/ntcir_filenames")):
+for filename, filepath in zip(*get_filenames_and_filepaths("raw_data/ntcir_filenames")):
     print "parsing document " + filename
     document = p.parse_metadata(filepath)
     dois = map(lambda x: x.ident, filter(lambda x: x.source == "doi", document.identifiers))
@@ -45,4 +43,9 @@ for filename, filepath in zip(get_filenames_and_filepaths("raw_data/ntcir_filena
         save_filename = filter(lambda c: c in printable, doi.replace('/', '_'))
 
         with open("downloaded_abstract_data/" + save_filename + ".xml", "w") as f:
-            f.write(get_doi_data(doi))
+            status, text = get_doi_data(doi)
+            print "response status: " + str(status)
+            f.write(text)
+            time.sleep(5)
+    else:
+        print "no doi available"
