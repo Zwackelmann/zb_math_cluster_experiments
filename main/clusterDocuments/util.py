@@ -22,6 +22,9 @@ import io
 import copy
 import itertools
 
+_config = None
+_cursor = None
+
 
 # file system
 def get_dirpath():
@@ -54,40 +57,69 @@ def files_in_dict(path, with_path=False):
         return filenames
 
 
+def config(prop):
+    global _config
+    if _config is None:
+        with open("conf/conf.json") as f:
+            _config = json.load(f)
+
+    return _config.get(prop)
+
+
 # csr matrixes
-def save_csr_matrix(array, filename):
-    np.savez(filename, data=array.data, indices=array.indices,
-             indptr=array.indptr, shape=array.shape)
+def save_csr_matrix(mat, filename):
+    """Saves the given csr_matrix under the given filename. The filename will probably end with '.npz'"""
+    np.savez(filename, data=mat.data, indices=mat.indices,
+             indptr=mat.indptr, shape=mat.shape)
 
 
 def load_csr_matrix(filename):
+    """Loads and returns the csr_matrix at the given filename."""
     loader = np.load(filename)
     return csr_matrix((loader['data'], loader['indices'], loader['indptr']),
                       shape=loader['shape'])
 
 
-def build_csr_matrix(list_of_maps, token_2_index_map=None, num_attributes=None):
-    if token_2_index_map is None and num_attributes is None:
-        raise ValueError("either token_2_index_map or num_attributes must be set")
-    elif (token_2_index_map is not None) and (num_attributes is not None):
-        raise ValueError("token_2_index_map and num_attributes cannot both be set")
+def build_csr_matrix(list_of_dicts, token2index_map=None, num_attributes=None):
+    """Returns a csr_matrix out of a list of dicts where each dict will correspond to a row in the created matrix.
+    Either token2index_map or num_attributes has to be set (but not both). The token2indey_map maps a token
+    (e.g. a text token) to a column index. If it is set each dict in the list of dicts must map tokens to certain a
+    value. e.g.
+        token2index_map = {'foo': 0, 'bar': 1, 'baz': 2}
+        list_of_dicts = [{'foo': 0.3, 'hello': -1.1}, {'bar': 0.5, 'baz': 0.5}, {'bar': 2.2, 'hello': 0.6, 'test': -0.2}]
+    will produce a matrix like:
+        [ [0.3 0.0 0.0],
+          [0.0 0.5 0.5],
+          [0.0 2.2 0.0]]
+
+    num_attribtes deternime the number of colums in the resulting matrix. If num_attributes is set, the dicts in
+    the list_of_dicts must map directly from a column index to a value. e.g.
+
+        num_attributes = 4
+        list_of_dicts = [{0: 0.3, 2: 1.1}, {1: 0.5, 2: 0.5}, {2: 2.2}]
+    will produce a matrix like:
+        [ [0.3 0.0 1.1 0.0],
+          [0.0 0.5 0.5 0.0],
+          [0.0 0.0 2.2 0.0]]"""
+
+    if token2index_map is None and num_attributes is None:
+        raise ValueError("either token2index_map or num_attributes must be set")
+    elif (token2index_map is not None) and (num_attributes is not None):
+        raise ValueError("token2index_map and num_attributes cannot both be set")
     else:
         pass
-
-    if not type(list_of_maps) is list:
-        list_of_maps = [list_of_maps]
 
     row = []
     col = []
     data = []
 
     i = 0
-    for m in list_of_maps:
+    for m in list_of_dicts:
         numerical_sorted_tokens = None
 
-        if token_2_index_map is not None:
-            tokens_in_dict = filter(lambda kv: kv[0] in token_2_index_map, m.items())
-            translated_tokens = map(lambda kv: (token_2_index_map[kv[0]], kv[1]), tokens_in_dict)
+        if token2index_map is not None:
+            tokens_in_dict = filter(lambda kv: kv[0] in token2index_map, m.items())
+            translated_tokens = map(lambda kv: (token2index_map[kv[0]], kv[1]), tokens_in_dict)
             numerical_sorted_tokens = sorted(translated_tokens, key=lambda x: x[0])
         elif num_attributes is not None:
             numerical_sorted_tokens = sorted(m.items(), key=lambda x: x[0])
@@ -101,10 +133,10 @@ def build_csr_matrix(list_of_maps, token_2_index_map=None, num_attributes=None):
 
         i += 1
 
-    shape_rows = len(list_of_maps)
+    shape_rows = len(list_of_dicts)
     shape_cols = None
-    if token_2_index_map is not None:
-        shape_cols = len(token_2_index_map)
+    if token2index_map is not None:
+        shape_cols = len(token2index_map)
     elif num_attributes is not None:
         shape_cols = num_attributes
     else:
@@ -114,6 +146,7 @@ def build_csr_matrix(list_of_maps, token_2_index_map=None, num_attributes=None):
 
 
 def vertically_append_matrix(srcMatrix, appendMatrix):
+    """Returns a new csr_matrix with srcMatrix and appendMatrix vertically put together. srcMatrix and appendMatrix must have the same number of rows."""
     numRows = srcMatrix.shape[0]
     numSrcCols = srcMatrix.shape[1]
     totalNumCols = srcMatrix.shape[1]+appendMatrix.shape[1]
@@ -140,6 +173,29 @@ def vertically_append_matrix(srcMatrix, appendMatrix):
     return csr_matrix((np.array(newData), np.array(newIndices), np.array(newIndptr)), shape=(numRows, totalNumCols))
 
 
+def element_wise_multiply(mat, factor):
+    """Returns a new csr_matrix with each element in the original csr_matrix multiplied by the given factor."""
+    newdata = np.array(map(lambda x: float(x)*factor, mat.data))
+    return csr_matrix((newdata, mat.indices, mat.indptr), shape=mat.shape)
+
+
+def row_wise_norm(mat):
+    """Returns a numpy array with the same number of rows and one column containing the norm of each row in the original matrix."""
+    matcopy = mat.copy()
+    matcopy.data **= 2
+    return np.transpose(np.array(map(lambda x: math.sqrt(x[0]), matcopy.sum(axis=1).tolist()), ndmin=2))
+
+
+def avg_row_norm(mat):
+    """Returns the average norm of each row in the given matrix."""
+    row_norms = map(lambda x: x[0], row_wise_norm(mat).tolist())
+    return sum(row_norms) / len(row_norms)
+
+
+def non_zero_row_indexes(mat):
+    return map(lambda x: x[0], filter(lambda x: x[1][0] != 0, enumerate(mat.sum(axis=1).tolist())))
+
+
 # db
 def connect_to_db():
     credentials = json.load(open("db_connect.json"))
@@ -147,14 +203,118 @@ def connect_to_db():
     return db
 
 
-def get_all_document_ids(cursor):
-    cursor.execute("SELECT id from document")
+def cursor():
+    global _cursor
+    if _cursor is None:
+        db = connect_to_db()
+        _cursor = db.cursor()
+    return _cursor
+
+
+def get_all_document_ids():
+    cursor().execute("SELECT id from document")
 
     document_ids = []
-    for row in cursor:
+    for row in cursor():
         document_ids.append(row[0])
 
     return document_ids
+
+
+def get_paragraphs_from_doc(document_id, data_basis):
+    paragraphs = {}
+
+    if data_basis == "only_theorems":
+        cursor().execute("""
+            SELECT paragraph_id, theorem_type, text FROM theorem
+            WHERE document = %(document)s
+        """, {"document": document_id})
+
+        for row in cursor():
+            paragraphs[row[0]] = {"type": row[1],
+                                  "text": row[2].decode('utf-16')}
+    elif data_basis == "full_text":
+        cursor().execute("""
+            SELECT paragraph_id, text FROM paragraph2
+            WHERE document = %(document)s
+        """, {"document": document_id})
+
+        for row in cursor():
+            paragraphs[row[0]] = {"text": row[1].decode('utf-16')}
+    else:
+        raise ValueError("data_basis must be either 'only_theorems' or 'full_text'")
+
+    return paragraphs
+
+
+def get_docs_paragraphs_as_token_list(document_id, method, data_basis):
+    doc_paragraphs = get_paragraphs_from_doc(document_id, data_basis)
+    formula_dict = get_formulas_from_doc(document_id)
+
+    paragraph_token_list = []
+    for paragraph_id, paragraph in doc_paragraphs.items():
+        paragraph_tokens = tokenize_mixed_text(paragraph['text'], formula_dict, method)
+        paragraph_token_list.append(((document_id, paragraph_id), paragraph_tokens))
+
+    return paragraph_token_list
+
+
+def get_all_docs_paragrahps_as_token_list(method, data_basis):
+    document_ids = get_all_document_ids()
+
+    gen = (paragraph for document_id in document_ids for paragraph in get_docs_paragraphs_as_token_list(document_id, method, data_basis))
+    if config("debug_max_items") is None:
+        return gen
+    else:
+        return itertools.islice(gen, 0, config("debug_max_items"))
+
+
+def get_formulas_from_doc(document_id):
+    cursor().execute("""
+        SELECT formula_id, p_math_ml, c_math_ml FROM formula
+        WHERE document = %(document)s
+    """, {"document": document_id})
+
+    formula_dict = {}
+    for row in cursor():
+        formula_dict[row[0]] = {"p_math_ml": row[1],
+                                "c_math_ml": row[2]}
+
+    return formula_dict
+
+
+def get_all_documents_as_feature_map(method, data_basis):
+    document_ids = get_all_document_ids()
+    count = 0
+
+    for document_id in document_ids:
+        doc_tokens = {}
+        paragraphs = get_docs_paragraphs_as_token_list(document_id, method, data_basis)
+        for id, tokens in paragraphs:
+            add_to_dict(doc_tokens, group_and_count(tokens))
+
+        if config("debug_max_items") is not None and count >= config("debug_max_items"):
+            return
+        count += 1
+        yield (document_id, doc_tokens)
+
+
+def get_all_documents_as_token_list(method, data_basis):
+    document_ids = get_all_document_ids()
+    count = 0
+
+    for document_id in document_ids:
+        doc_tokens = []
+        paragraphs = get_docs_paragraphs_as_token_list(document_id, method, data_basis)
+        for id, tokens in paragraphs:
+            doc_tokens.extend(tokens)
+
+        if config("debug_max_items") is not None and count >= config("debug_max_items"):
+            return
+
+        count += 1
+
+        yield (document_id, doc_tokens)
 
 
 def numpy_arr_2_bin(arr):
@@ -453,11 +613,11 @@ class Document:
         else:
             return ids[0].ident
 
-    def to_data_map(self, token_2_index_map):
+    def to_data_map(self, token2index_map):
         data_map = dict()
         for t in self.full_text_tokens:
-            if t in token_2_index_map:
-                i = token_2_index_map[t]
+            if t in token2index_map:
+                i = token2index_map[t]
                 if i not in data_map:
                     data_map[i] = 0
 
@@ -465,7 +625,7 @@ class Document:
 
         return data_map
 
-    def to_arff_json_document(self, token_2_index_map):
+    def to_arff_json_document(self, token2index_map):
         str_buffer = []
         str_buffer.append("[[\"")
 
@@ -483,7 +643,7 @@ class Document:
         str_buffer.append(",".join(map(lambda cl: "\"" + cl + "\"", self.zb_msc_cats)))
         str_buffer.append("]],{")
 
-        data_map = self.to_data_map(token_2_index_map)
+        data_map = self.to_data_map(token2index_map)
         sorted_keys = sorted(data_map.items(), key=lambda x: int(x[0]))
         str_buffer.append(",".join(map(lambda kv: "\"" + str(kv[0]) + "\":" + str(kv[1]), sorted_keys)))
 
@@ -519,6 +679,17 @@ class DocumentParser:
         self.text_tokenizer = DocumentParser.TextTokenizer()
         self.formula_tokenizer = DocumentParser.FormulaTokenizer()
         self.sentence_detector = nltk.data.load('tokenizers/punkt/english.pickle')
+
+    def parse_metadata(self, filepath):
+        source = open(filepath)
+        raw_document = DocumentParser.RawDocument()
+        ch = DocumentParser.ZbMathContentHandler(raw_document, read="metadata")
+        try:
+            xml.sax.parse(source, ch)
+        except StopIteration:
+            pass
+
+        return raw_document.to_document()
 
     def parse(self, filepath):
         source = open(filepath)
@@ -695,10 +866,11 @@ class DocumentParser:
     RawDocument.date_format = ""
 
     class ZbMathContentHandler(xml.sax.ContentHandler):
-        def __init__(self, raw_document):
+        def __init__(self, raw_document, read="all"):
             xml.sax.ContentHandler.__init__(self)
             self.path = []
             self.document = raw_document
+            self.read = read
 
             # mathml capturing
             self.formula_id = None
@@ -716,6 +888,9 @@ class DocumentParser:
                 if len(self.path) >= 2 and self.path[-2] == "identifiers" and self.path[-1] == "id":
                     self.document.identifiers.append({'type': attrs['type']})
             elif self.path[1] == "content":
+                if self.read == "metadata":
+                    raise StopIteration
+
                 if self.capturing_math_state is None:
                     if name == "math":
                         self.formula_id = ascii_escape(attrs['id']) if 'id' in attrs.keys() else None
@@ -880,7 +1055,7 @@ formula_parse_error_count = 0
 class FormulaTokenizer:
     nodeCounter = 0
 
-    def tokenize(self, formula, method, config_args={}):
+    def tokenize(self, formula, method):
         if method == "kristianto":
             global formula_parse_error_count
             ch = FormulaTokenizer.FormulaContentHandler()
@@ -902,10 +1077,10 @@ class FormulaTokenizer:
                 FormulaTokenizer.lin_tokenize(root, 1, tokens)
 
                 mtokens = map(lambda x: x[0], tokens)
-                if "lin_max_token_length" not in config_args or config_args["lin_max_token_length"] is None:
+                if config("lin_max_token_length") is None:
                     return mtokens
                 else:
-                    return filter(lambda x: len(x) <= config_args["lin_max_token_length"], mtokens)
+                    return filter(lambda x: len(x) <= config("lin_max_token_length"), mtokens)
 
             except xml.sax._exceptions.SAXParseException:
                 print "Formula parse error! (" + str(formula_parse_error_count) + ")"
@@ -1133,6 +1308,34 @@ class MixedTextSeparator:
 
         parts.append(MixedTextSeparator.TextPassage(text))
         return parts
+
+
+def tokenize_mixed_text(paragraph_text, formula_dict, method):
+    sep = MixedTextSeparator()
+    ft = FormulaTokenizer()
+    tt = TextTokenizer()
+
+    tokens = []
+    parts = sep.split(paragraph_text)
+    for part in parts:
+        if type(part) is MixedTextSeparator.FormulaId:
+            if part.fid in formula_dict:
+                if method == "kristianto":
+                    tokens.extend(ft.tokenize(formula_dict[part.fid]['c_math_ml'], method))
+                elif method == "lin":
+                    tokens.extend(ft.tokenize(formula_dict[part.fid]['c_math_ml'], method))
+                elif method == "plaintext":
+                    pass
+                else:
+                    raise ValueError("Method must be either 'kristianto' or 'lin'")
+            else:
+                pass
+        elif type(part) is MixedTextSeparator.TextPassage:
+            tokens.extend(tt.tokenize(part.text))
+        else:
+            raise ValueError("Part is neither a FormulaId nor a TextPassage")
+
+    return tokens
 
 
 # plotting
