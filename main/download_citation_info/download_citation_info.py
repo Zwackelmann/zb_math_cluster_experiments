@@ -34,8 +34,9 @@ def get_doi_data(doi):
 filenames = files_in_dict("raw_data/test_documents", with_path=False)
 p = DocumentParser()
 
-for filename in filenames:
-    document = p.parse_metadata("raw_data/test_documents/" + filename)
+for filename, filepath in get_filenames_and_filepaths():
+    print "parsing document " + filename
+    document = p.parse_metadata(filepath)
     dois = map(lambda x: x.ident, filter(lambda x: x.source == "doi", document.identifiers))
 
     if len(dois) != 0:
