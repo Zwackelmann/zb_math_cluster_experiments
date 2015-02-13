@@ -34,7 +34,7 @@ def get_doi_data(doi):
 # filenames = files_in_dict("raw_data/test_documents", with_path=False)
 p = DocumentParser()
 
-for filename, filepath in get_filenames_and_filepaths("raw_data/ntcir_filenames"):
+for filename, filepath in zip(get_filenames_and_filepaths("raw_data/ntcir_filenames")):
     print "parsing document " + filename
     document = p.parse_metadata(filepath)
     dois = map(lambda x: x.ident, filter(lambda x: x.source == "doi", document.identifiers))
