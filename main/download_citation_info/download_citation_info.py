@@ -5,6 +5,7 @@ from pprint import pprint
 from main.clusterDocuments.util import get_filenames_and_filepaths, files_in_dict, DocumentParser
 from string import printable
 import time
+from os import path
 
 conn = httplib.HTTPConnection("api.elsevier.com:80")
 
@@ -42,10 +43,13 @@ for filename, filepath in zip(*get_filenames_and_filepaths("raw_data/ntcir_filen
 
         save_filename = filter(lambda c: c in printable, doi.replace('/', '_'))
 
-        with open("downloaded_abstract_data/" + save_filename + ".xml", "w") as f:
-            status, text = get_doi_data(doi)
-            print "response status: " + str(status)
-            f.write(text)
-            time.sleep(5)
+        if not path.isfile("downloaded_abstract_data/" + save_filename + ".xml"):
+            with open("downloaded_abstract_data/" + save_filename + ".xml", "w") as f:
+                status, text = get_doi_data(doi)
+                print "response status: " + str(status)
+                f.write(text)
+                time.sleep(5)
+	else:
+            print "already exists"
     else:
         print "no doi available"
