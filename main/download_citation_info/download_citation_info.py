@@ -44,11 +44,25 @@ for filename, filepath in zip(*get_filenames_and_filepaths("raw_data/ntcir_filen
         save_filename = filter(lambda c: c in printable, doi.replace('/', '_'))
 
         if not path.isfile("downloaded_abstract_data/" + save_filename + ".xml"):
-            with open("downloaded_abstract_data/" + save_filename + ".xml", "w") as f:
+            while True:
                 status, text = get_doi_data(doi)
-                print "response status: " + str(status)
-                f.write(text)
-                time.sleep(5)
+                if status == 200:
+                    with open("downloaded_abstract_data/" + save_filename + ".xml", "w") as f:
+                        print "success"
+                        f.write(text)
+                        time.sleep(5)
+                        break
+                elif status == 429:
+                    print "too many requests. Wait 2 hours"
+                    time.sleep(60*60*2)
+                elif status == 404:
+                    print "not found"
+                    time.sleep(5)
+                    break
+                else:
+                    print "status " + str(status)
+                    time.sleep(5)
+                    break
 	else:
             print "already exists"
     else:
