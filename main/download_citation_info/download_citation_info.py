@@ -6,31 +6,49 @@ from main.clusterDocuments.util import get_filenames_and_filepaths, files_in_dic
 from string import printable
 import time
 from os import path
-
-conn = httplib.HTTPConnection("api.elsevier.com:80")
+from socket import error as SocketError
+import errno
 
 api_key1 = "a1036f9334647a67fefa01d78c159311"
 api_key2 = "893a8d2b5dc7d5923e86a25b0f17dc01"
 api_key3 = "6492f9c867ddf3e84baa10b5971e3e3d"
 api_key = api_key3
 
-headers = {"Content-type": "application/x-www-form-urlencoded", "Accept": "text/xml"}
-doi = "10.1016/j.disc.200710.025"
-doi2 = "10.1016/S0014-5793(01)03313-0"
-doi3 = "10.1016/j.disc.2007.10.025"
-doi4 = "10.1007/s00220-008-0461-1"
+elsevier_url = "api.elsevier.com:80"
+
+conn = None
+
+
+def get_connection():
+    global conn
+    if conn == None:
+        conn = httplib.HTTPConnection(elsevier_url)
+    
+    return conn
+
+
+def refresh_connection():
+    global conn
+    conn = httplib.HTTPConnection(elsevier_url)
 
 
 def get_doi_data(doi):
-    conn.request(
-        "GET",
-        "/content/abstract/doi/%(doi)s?apiKey=%(api-key)s" % {
-            "doi": doi,
-            "api-key": api_key}
-    )
-    res = conn.getresponse()
+    while True:
+        try:
+            get_connection().request(
+                "GET",
+                "/content/abstract/doi/%(doi)s?apiKey=%(api-key)s" % {
+                    "doi": doi,
+                    "api-key": api_key}
+            )
+            res = get_connection().getresponse()
+            return res.status, res.read()
+        except SocketError as e:
+            if e.errno == errno.ECONNRESET:
+                refresh_connection()
+            else:
+                raise e
 
-    return res.status, res.read()
 
 p = DocumentParser()
 for filename, filepath in zip(*get_filenames_and_filepaths("raw_data/ntcir_filenames")):
@@ -48,14 +66,16 @@ for filename, filepath in zip(*get_filenames_and_filepaths("raw_data/ntcir_filen
                 status, text = get_doi_data(doi)
                 if status == 200:
                     with open("downloaded_abstract_data/" + save_filename + ".xml", "w") as f:
-                        print "success"
                         f.write(text)
-                        time.sleep(5)
-                        break
+                    time.sleep(5)
+                    print "success"
+                    break
                 elif status == 429:
                     print "too many requests. Wait 2 hours"
                     time.sleep(60*60*2)
                 elif status == 404:
+                    with open("downloaded_abstract_data/" + save_filename + ".xml", "w") as f:
+                        f.write("not found")
                     print "not found"
                     time.sleep(5)
                     break
